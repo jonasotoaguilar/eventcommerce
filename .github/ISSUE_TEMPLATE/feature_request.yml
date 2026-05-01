@@ -1,0 +1,84 @@
+name: Feature Request
+description: Proponé una mejora o nueva capacidad para EventCommerce
+labels: ["enhancement", "status:needs-review"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📋 How this works
+
+        1. **Submit** this feature request → it gets the `status:needs-review` label automatically
+        2. A **maintainer reviews** it and adds `status:approved` (or closes it as out-of-scope/duplicate)
+        3. **Only then** should you (or anyone) open a PR to implement it
+
+        PRs that implement features without `status:approved` on the linked issue will be automatically rejected.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight Checklist
+      options:
+        - label: Revisé los issues existentes de EventCommerce y esto no es un duplicado
+          required: true
+        - label: Entiendo que un PR será rechazado si el issue vinculado no tiene `status:approved`
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 🔍 Affected Area
+      description: ¿Qué parte de EventCommerce impacta este cambio?
+      options:
+        - Backend / API HTTP
+        - Orders module
+        - Inventory module
+        - Payments module
+        - Notifications module
+        - Shared config / database
+        - Tooling / CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 💡 Problem Statement
+      description: ¿Qué problema querés resolver? Explicalo con claridad.
+      placeholder: |
+        Hoy no podemos...
+        El flujo actual falla cuando...
+        Para implementar X hoy hay que hacer Y manualmente...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 📦 Proposed Solution
+      description: Describí la solución esperada. Sé lo más específico posible.
+      placeholder: |
+        Ejemplo:
+        - Nuevo endpoint / comportamiento esperado
+        - Cambios de arquitectura o infraestructura necesarios
+        - Cómo debería verse el resultado final
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Alternatives Considered
+      description: Describí alternativas consideradas, tradeoffs o workarounds actuales.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 📎 Additional Context
+      description: Agregá contexto adicional, ejemplos, referencias o decisiones de arquitectura relevantes.
+    validations:
+      required: false
