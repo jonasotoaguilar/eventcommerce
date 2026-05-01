@@ -1,5 +1,6 @@
 """Orders domain errors."""
 
+
 class OrdersDomainError(Exception):
     """Base error for orders domain."""
 
@@ -10,4 +11,3 @@ class OrderNotFoundError(OrdersDomainError):
 
 class InvalidStateTransitionError(OrdersDomainError):
     """Raised when an invalid state transition is attempted."""
-

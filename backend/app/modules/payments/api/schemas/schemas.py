@@ -1,4 +1,5 @@
 """Payments API schemas."""
+
 from pydantic import BaseModel
 
 
@@ -8,4 +9,3 @@ class PaymentResponse(BaseModel):
     status: str
     amount: float
     currency: str
-

@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 
 from app.modules.inventory.api.routes.v1.router import router as inventory_router
-from app.modules.notifications.api.routes.v1.router import router as notifications_router
+from app.modules.notifications.api.routes.v1.router import (
+    router as notifications_router,
+)
 from app.modules.orders.api.routes.v1.router import router as orders_router
 from app.modules.payments.api.routes.v1.router import router as payments_router
 from app.shared.config import get_settings

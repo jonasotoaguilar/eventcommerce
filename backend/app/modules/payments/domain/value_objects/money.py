@@ -1,4 +1,5 @@
 """Money value object."""
+
 from dataclasses import dataclass
 
 
@@ -6,4 +7,3 @@ from dataclasses import dataclass
 class Money:
     amount: float
     currency: str
-

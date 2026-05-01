@@ -1,4 +1,5 @@
 """Notification domain entity."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -11,4 +12,3 @@ class Notification:
     channel: str
     content: str
     sent_at: datetime
-

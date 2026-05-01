@@ -1,4 +1,5 @@
 """Inventory domain events."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -11,4 +12,3 @@ class InventoryReserved:
     product_id: str
     quantity: int
     occurred_at: datetime
-

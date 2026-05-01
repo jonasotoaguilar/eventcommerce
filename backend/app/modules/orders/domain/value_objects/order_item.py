@@ -1,4 +1,5 @@
 """Order item value object."""
+
 from dataclasses import dataclass
 
 
@@ -6,4 +7,3 @@ from dataclasses import dataclass
 class OrderItem:
     product_id: str
     quantity: int
-

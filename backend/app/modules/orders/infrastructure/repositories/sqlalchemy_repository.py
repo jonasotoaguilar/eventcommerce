@@ -1,4 +1,5 @@
 """SQLAlchemy implementation of OrderRepository."""
+
 from uuid import UUID
 
 from app.modules.orders.domain.entities.order import Order
@@ -14,4 +15,3 @@ class SqlAlchemyOrderRepository(OrderRepository):
 
     async def save(self, order: Order) -> None:
         pass
-

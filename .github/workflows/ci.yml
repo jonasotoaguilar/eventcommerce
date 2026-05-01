@@ -1,10 +1,14 @@
-name: CI
+name: Backend CI
 
 on:
   pull_request:
+    paths:
+      - "backend/**"
   push:
     branches:
       - main
+    paths:
+      - "backend/**"
 
 jobs:
   backend-validation:

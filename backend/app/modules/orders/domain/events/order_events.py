@@ -1,4 +1,5 @@
 """Order domain events."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -10,4 +11,3 @@ class OrderCreated:
     order_id: UUID
     customer_id: str
     occurred_at: datetime
-

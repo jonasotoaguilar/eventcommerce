@@ -1,11 +1,18 @@
 """SendOrderNotification use case."""
+
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 from app.modules.notifications.domain.entities.notification import Notification
-from app.modules.notifications.domain.errors.domain_errors import ChannelNotSupportedError
-from app.modules.notifications.domain.repositories.repository import NotificationRepository
-from app.modules.notifications.domain.services.notification_domain_service import is_channel_supported
+from app.modules.notifications.domain.errors.domain_errors import (
+    ChannelNotSupportedError,
+)
+from app.modules.notifications.domain.repositories.repository import (
+    NotificationRepository,
+)
+from app.modules.notifications.domain.services.notification_domain_service import (
+    is_channel_supported,
+)
 
 
 class SendOrderNotification:
@@ -24,4 +31,3 @@ class SendOrderNotification:
         )
         await self._repository.save(notification)
         return notification
-

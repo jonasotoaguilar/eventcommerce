@@ -1,4 +1,5 @@
 """GetOrder use case."""
+
 from uuid import UUID
 
 from app.modules.orders.domain.entities.order import Order
@@ -15,4 +16,3 @@ class GetOrder:
         if order is None:
             raise OrderNotFoundError(f"Order {order_id} not found")
         return order
-

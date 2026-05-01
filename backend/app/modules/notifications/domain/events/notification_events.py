@@ -1,4 +1,5 @@
 """Notification domain events."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -10,4 +11,3 @@ class OrderNotificationSent:
     order_id: UUID
     channel: str
     occurred_at: datetime
-

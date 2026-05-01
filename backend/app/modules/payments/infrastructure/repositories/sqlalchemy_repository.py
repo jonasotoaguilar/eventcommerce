@@ -1,4 +1,5 @@
 """SQLAlchemy implementation of PaymentRepository."""
+
 from uuid import UUID
 
 from app.modules.payments.domain.entities.payment import Payment
@@ -14,4 +15,3 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
 
     async def save(self, payment: Payment) -> None:
         pass
-

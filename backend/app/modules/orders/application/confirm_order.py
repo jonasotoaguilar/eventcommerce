@@ -1,4 +1,5 @@
 """ConfirmOrder use case."""
+
 from uuid import UUID
 
 from app.modules.orders.domain.errors.domain_errors import InvalidStateTransitionError
@@ -15,7 +16,8 @@ class ConfirmOrder:
         if order is None:
             raise InvalidStateTransitionError("Order not found")
         if not can_transition(order.status, "confirmed"):
-            raise InvalidStateTransitionError(f"Cannot confirm order in status {order.status}")
+            raise InvalidStateTransitionError(
+                f"Cannot confirm order in status {order.status}"
+            )
         order.status = "confirmed"
         await self._repository.save(order)
-

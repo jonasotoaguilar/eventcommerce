@@ -1,5 +1,4 @@
 """ReleaseInventory use case."""
-from uuid import UUID
 
 from app.modules.inventory.domain.repositories.repository import InventoryRepository
 
@@ -14,4 +13,3 @@ class ReleaseInventory:
             inventory.reserved_quantity -= quantity
             inventory.available_quantity += quantity
             await self._repository.save(inventory)
-

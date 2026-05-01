@@ -1,11 +1,14 @@
 """AuthorizePayment use case."""
+
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.errors.domain_errors import PaymentRejectedError
 from app.modules.payments.domain.repositories.repository import PaymentRepository
-from app.modules.payments.domain.services.payment_domain_service import authorize_payment
+from app.modules.payments.domain.services.payment_domain_service import (
+    authorize_payment,
+)
 
 
 class AuthorizePayment:
@@ -25,4 +28,3 @@ class AuthorizePayment:
         )
         await self._repository.save(payment)
         return payment
-

@@ -1,8 +1,11 @@
 """SQLAlchemy implementation of NotificationRepository."""
+
 from uuid import UUID
 
 from app.modules.notifications.domain.entities.notification import Notification
-from app.modules.notifications.domain.repositories.repository import NotificationRepository
+from app.modules.notifications.domain.repositories.repository import (
+    NotificationRepository,
+)
 
 
 class SqlAlchemyNotificationRepository(NotificationRepository):
@@ -14,4 +17,3 @@ class SqlAlchemyNotificationRepository(NotificationRepository):
 
     async def save(self, notification: Notification) -> None:
         pass
-

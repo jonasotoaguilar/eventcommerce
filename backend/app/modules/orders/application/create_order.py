@@ -1,6 +1,7 @@
 """CreateOrder use case."""
-from uuid import UUID, uuid4
+
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from app.modules.orders.domain.entities.order import Order
 from app.modules.orders.domain.value_objects.order_item import OrderItem
@@ -16,4 +17,3 @@ class CreateOrder:
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
-

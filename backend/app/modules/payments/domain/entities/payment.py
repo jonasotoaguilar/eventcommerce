@@ -1,4 +1,5 @@
 """Payment domain entity."""
+
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -12,4 +13,3 @@ class Payment:
     amount: float
     currency: str
     created_at: datetime
-

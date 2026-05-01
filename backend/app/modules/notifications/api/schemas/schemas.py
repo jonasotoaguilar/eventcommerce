@@ -1,4 +1,5 @@
 """Notifications API schemas."""
+
 from pydantic import BaseModel
 
 
@@ -7,4 +8,3 @@ class NotificationResponse(BaseModel):
     order_id: str
     channel: str
     content: str
-

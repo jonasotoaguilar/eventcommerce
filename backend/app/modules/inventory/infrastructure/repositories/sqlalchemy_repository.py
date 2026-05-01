@@ -1,4 +1,5 @@
 """SQLAlchemy implementation of InventoryRepository."""
+
 from app.modules.inventory.domain.entities.inventory import Inventory
 from app.modules.inventory.domain.repositories.repository import InventoryRepository
 
@@ -12,4 +13,3 @@ class SqlAlchemyInventoryRepository(InventoryRepository):
 
     async def save(self, inventory: Inventory) -> None:
         pass
-
