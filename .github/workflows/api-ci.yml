@@ -1,0 +1,47 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+
+jobs:
+  backend-validation:
+    name: Backend Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync backend dependencies
+        run: uv sync --dev
+        working-directory: backend
+
+      - name: Run ruff check
+        run: uv run ruff check .
+        working-directory: backend
+
+      - name: Run ruff format check
+        run: uv run ruff format --check .
+        working-directory: backend
+
+      - name: Run pyrefly
+        run: uv run pyrefly check
+        working-directory: backend
+
+      - name: Run pytest
+        run: uv run pytest
+        working-directory: backend
