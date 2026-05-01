@@ -1,0 +1,36 @@
+[project]
+name = "eventcommerce-backend"
+version = "0.1.0"
+description = "Backend modular para EventCommerce Core"
+readme = "README.md"
+authors = [
+    { name = "Jonathan Soto", email = "jonasotoaguilar@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.136.1",
+    "psycopg[binary]>=3.3.3",
+    "pydantic-settings>=2.14.0",
+    "sqlalchemy>=2.0.49",
+    "uvicorn>=0.46.0",
+]
+
+[project.scripts]
+eventcommerce-backend = "app.main:main"
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyrefly>=0.63.1",
+    "pytest>=9.0.3",
+]
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""
+
+[tool.pyrefly]
+project-includes = ["app/**/*.py"]
