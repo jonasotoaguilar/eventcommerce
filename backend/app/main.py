@@ -1,5 +1,13 @@
+from app.shared.config import get_settings
+
 import uvicorn
 
 
 def main() -> None:
-    uvicorn.run("app.app:app", host="0.0.0.0", port=8000, reload=True)
+    settings = get_settings()
+    uvicorn.run(
+        "app.app:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
+    )

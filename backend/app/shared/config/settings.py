@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     app_name: str = "EventCommerce Backend"
     app_version: str = "0.1.0"
     debug: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8000
+    reload: bool = False
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@localhost:5432/eventcommerce",
         description="Database connection string for the backend.",

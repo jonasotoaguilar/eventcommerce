@@ -1,11 +1,8 @@
 """Pure domain logic for payments."""
 
-import random
-
 from app.modules.payments.domain.errors.domain_errors import PaymentRejectedError
 
 
-def authorize_payment(amount: float) -> bool:
+def ensure_payment_amount_is_valid(amount: float) -> None:
     if amount <= 0:
         raise PaymentRejectedError("Invalid amount")
-    return random.choice([True, True, True, False])

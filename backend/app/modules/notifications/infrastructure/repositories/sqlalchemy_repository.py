@@ -2,6 +2,8 @@
 
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.notifications.domain.entities.notification import Notification
 from app.modules.notifications.domain.repositories.repository import (
     NotificationRepository,
@@ -9,7 +11,7 @@ from app.modules.notifications.domain.repositories.repository import (
 
 
 class SqlAlchemyNotificationRepository(NotificationRepository):
-    def __init__(self, session: object) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def get_by_id(self, notification_id: UUID) -> Notification | None:

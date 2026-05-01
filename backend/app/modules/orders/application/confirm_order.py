@@ -2,7 +2,10 @@
 
 from uuid import UUID
 
-from app.modules.orders.domain.errors.domain_errors import InvalidStateTransitionError
+from app.modules.orders.domain.errors.domain_errors import (
+    InvalidStateTransitionError,
+    OrderNotFoundError,
+)
 from app.modules.orders.domain.repositories.repository import OrderRepository
 from app.modules.orders.domain.services.order_domain_service import can_transition
 
@@ -14,7 +17,7 @@ class ConfirmOrder:
     async def execute(self, order_id: UUID) -> None:
         order = await self._repository.get_by_id(order_id)
         if order is None:
-            raise InvalidStateTransitionError("Order not found")
+            raise OrderNotFoundError("Order not found")
         if not can_transition(order.status, "confirmed"):
             raise InvalidStateTransitionError(
                 f"Cannot confirm order in status {order.status}"

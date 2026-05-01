@@ -2,12 +2,14 @@
 
 from uuid import UUID
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.payments.domain.entities.payment import Payment
 from app.modules.payments.domain.repositories.repository import PaymentRepository
 
 
 class SqlAlchemyPaymentRepository(PaymentRepository):
-    def __init__(self, session: object) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def get_by_id(self, payment_id: UUID) -> Payment | None:

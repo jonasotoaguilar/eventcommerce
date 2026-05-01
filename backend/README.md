@@ -28,22 +28,30 @@ EVENTCOMMERCE_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432
 app/
   modules/
     orders/
-      api/v1/
+      api/
+        routes/v1/
+        schemas/
       application/
       domain/
       infrastructure/
     inventory/
-      api/v1/
+      api/
+        routes/v1/
+        schemas/
       application/
       domain/
       infrastructure/
     payments/
-      api/v1/
+      api/
+        routes/v1/
+        schemas/
       application/
       domain/
       infrastructure/
     notifications/
-      api/v1/
+      api/
+        routes/v1/
+        schemas/
       application/
       domain/
       infrastructure/
