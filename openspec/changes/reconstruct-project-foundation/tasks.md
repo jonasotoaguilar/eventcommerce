@@ -58,8 +58,8 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 4: ARCHITECTURE narrative (W4a, PR 4, ≤320)
 
-- [ ] 4a.1 Create `ARCHITECTURE.md` core: Overview, Topology (`flowchart LR`), Bounded contexts, Patterns, ADR index (planned paths), DESIGN link.
-- [ ] 4a.2 Validate: ADR index planned paths; DESIGN link planned; `mmdc` renders.
+- [x] 4a.1 Create `ARCHITECTURE.md` core: Overview, Topology (`flowchart LR`), Bounded contexts, Patterns, ADR index (planned paths), DESIGN link.
+- [x] 4a.2 Validate: ADR index planned paths; DESIGN link planned; `mmdc` renders.
 
 ## Phase 5: ARCHITECTURE matrix + diagrams (W4b, PR 5, ≤400)
 
