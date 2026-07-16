@@ -1,6 +1,6 @@
 # Architecture
 
-> **Canonical architecture notice**  
+> **Canonical architecture notice**
 > This document describes `eventcommerce` as it exists in the working tree today, plus the planned MVP target. Claims are tagged **Now** (committed and wired), **MVP Target** (next vertical slices), or **Future** (not committed). If a capability is partial — code exists but is not scheduled or connected — it is labeled **Partial** and never described as live.
 >
 > Product intent lives in [PRD.md](./PRD.md). Domain and event vocabulary is owned by [docs/GLOSSARY.md](./docs/GLOSSARY.md). Target UX lives in [DESIGN.md](./DESIGN.md). Significant decisions are recorded in the [ADR index](./docs/adr/README.md).
@@ -138,15 +138,120 @@ Rules:
 
 ## Cross-cutting concerns
 
-> Placeholder for W4b expansion: configuration (`pydantic-settings`), error handling, logging/observability, DI container strategy, and request-scoped session management.
+### Configuration
+
+`backend/app/shared/config/settings.py` uses `pydantic-settings` to load environment variables from `.env` with the `EVENTCOMMERCE_` prefix and validation aliases for Postgres/RabbitMQ atomic variables. This is **Now**.
+
+### Error handling
+
+Each bounded context owns domain errors (`InvalidStateTransitionError`, `OrderNotFoundError`, `PaymentRejectedError`, etc.). Application use cases raise domain errors; API routes translate them to HTTP responses (e.g., `OrderNotFoundError` → 404). This is **Now** for orders; **MVP Target** for the remaining contexts.
+
+### Security and auth boundaries
+
+There is no authentication or authorization code today. Public health endpoints and the orders CRUD surface run without auth. IAM as an owned bounded context with JWT registration, login, and role enforcement is an **MVP Target**. Planned ADR: [0004-own-iam-context](./docs/adr/0004-own-iam-context.md).
+
+### Observability
+
+The backend uses standard Python logging only. Structured logs, correlation IDs, metrics, and distributed tracing are **Target** (post-MVP). See [Future roadmap](#future-roadmap) below.
+
+### DI container strategy
+
+`dependency-injector` provides per-module containers. `OrdersContainer` wires repositories and use cases; `InventoryContainer`, `PaymentsContainer`, and `NotificationsContainer` are empty placeholders. This is **Partial** — the pattern is proven in orders but not replicated. Planned ADR: [0003-use-dependency-injector](./docs/adr/0003-use-dependency-injector.md).
+
+### Request-scoped session management
+
+`backend/app/modules/orders/api/routes.py` overrides the container's `session` dependency per request via `_orders_db_session`, then resets the override in a `finally` block. This keeps the unit of work request-scoped and is **Now**.
+
+### Consistency and idempotency
+
+`ProcessedEventStore` (`backend/app/shared/messaging/idempotency.py`) guards against duplicate event handling using the `processed_events` table with a `(event_id, consumer_name)` unique constraint. The outbox pattern atomically persists business state and pending events. These primitives are **Now**; wired consumers that exercise them end-to-end are **MVP Target**. Domain terms are defined in [docs/GLOSSARY.md](./docs/GLOSSARY.md).
 
 ## Non-functional requirements
 
-> Placeholder for W4b expansion: measurable NFRs for latency, idempotency, testability, and local reproducibility.
+The table below tags every target as **Now**, **MVP Target**, or **Future**. Anything not implemented today is labeled honestly.
+
+| Concern | Horizon | Target | How measured |
+|---|---|---|---|
+| Order state correctness | Now | 100% of simulated orders end in a valid terminal state with the expected event sequence | Domain tests assert `pending → confirmed` / `pending → cancelled` only. |
+| Consumer idempotency | MVP Target | Replaying the same event batch produces zero duplicate inventory, payment, or notification records | Replay test counts rows before/after. |
+| Payment simulation reproducibility | MVP Target | Identical inputs produce the same authorization result across 100 repeated runs | Fixed-seed / deterministic policy test. |
+| End-to-end checkout latency | MVP Target | p95 < 500 ms on the deterministic local path | pytest benchmark around checkout use case. |
+| API health latency | Now | p95 < 100 ms for `GET /health` and module `_health` endpoints | httpx timing against local server. |
+| Domain + application test coverage | Now | ≥ 80% of domain and application use-case lines covered | `pytest --cov` over `backend/app/modules/*/domain/` and `application/`. |
+| Local reproducibility | Now | `pytest` passes locally without external secrets or paid services | CI / local run. |
+| Auth boundary enforcement | MVP Target | All cart, checkout, and operator endpoints reject unauthenticated or unauthorized requests | Integration tests with JWT. |
+| Structured observability | Future | Request correlation IDs and structured JSON logs in local and CI runs | Log output inspection. |
+| Recovery and dead-letter handling | Future | Failed consumers retry with exponential backoff and land in a DLQ after exhaustion | Acceptance test with broker stopped. |
 
 ## Current Implementation Status
 
-> Placeholder for W4b expansion: decision/status matrix with columns `Decision | Horizon | Status | Code evidence | Doc location`. Status values are `implemented`, `partial`, or `target`. Partial capabilities will not be described in present tense.
+**Horizon vs Status semantics**: `Horizon` is the planning bucket — `Now` (committed today), `MVP Target` (planned for the MVP), or `Future` (intentionally not committed). `Status` is the implementation state of that decision: `implemented` (code exists and is wired), `partial` (code exists but is not connected or not complete), or `target` (not yet implemented). A `Future` row always carries `Status = target` because it is non-binding.
+
+| Decision | Horizon | Status | Code evidence | Doc location |
+|---|---|---|---|---|
+| Bounded context scaffold: orders, inventory, payments, notifications | Now | implemented | `backend/app/modules/orders/`, `backend/app/modules/inventory/`, `backend/app/modules/payments/`, `backend/app/modules/notifications/` | Bounded contexts |
+| Orders HTTP API surface (create, get, timeline) | Now | implemented | `backend/app/modules/orders/api/routes.py` | API Layer |
+| Inventory / Payments / Notifications API surface | Now | partial | `backend/app/modules/inventory/api/routes.py`, `backend/app/modules/payments/api/routes.py`, `backend/app/modules/notifications/api/routes.py` expose only `GET /_health` | API Layer |
+| Shared event store (`domain_events`) | Now | implemented | `backend/app/shared/events/event_repository.py`, `backend/app/shared/events/models.py` | Patterns |
+| Shared event envelope | Now | implemented | `backend/app/shared/messaging/envelope.py` | Patterns |
+| Transactional outbox models + repository | Now | implemented | `backend/app/shared/messaging/outbox_repository.py`, `backend/app/shared/messaging/models.py` | Patterns |
+| Outbox worker + scheduler | Now | partial | `backend/app/shared/messaging/outbox_worker.py` exists; no scheduler invokes `run_once()` | Patterns |
+| RabbitMQ publisher | Now | partial | `backend/app/shared/messaging/rabbitmq_publisher.py` exists; not wired into `backend/app/app.py` lifespan | Patterns |
+| AMQP consumer / event choreography | MVP Target | target | No consumer code yet | Patterns |
+| Idempotent consumer store (`ProcessedEventStore`) | Now | partial | `backend/app/shared/messaging/idempotency.py` is used by use cases; wired consumers are not live | Cross-cutting concerns |
+| `processed_events` unique constraint | Now | implemented | `backend/app/shared/messaging/models.py` (`uq_processed_event`) | Cross-cutting concerns |
+| `pydantic-settings` configuration | Now | implemented | `backend/app/shared/config/settings.py` | Cross-cutting concerns |
+| `dependency-injector` DI containers | Now | partial | `backend/app/modules/orders/api/container.py` is wired; inventory/payments/notifications containers are empty | Cross-cutting concerns |
+| Request-scoped session override | Now | implemented | `backend/app/modules/orders/api/routes.py` (`_orders_db_session`) | Cross-cutting concerns |
+| IAM bounded context (JWT, roles) | MVP Target | target | No code | Bounded contexts |
+| Catalog bounded context | MVP Target | target | No code | Bounded contexts |
+| Cart bounded context | MVP Target | target | No code | Bounded contexts |
+| Checkout orchestrator | MVP Target | target | No code | Bounded contexts |
+| Deterministic simulated payment provider | MVP Target | target | `backend/app/modules/payments/application/authorize_payment.py` still uses a random stub | Patterns |
+| Frontend storefront | Future | target | `frontend/` is empty | Future |
+
+### Commerce event flow
+
+The diagram below shows what is implemented now, what exists as code but is not scheduled, and what is only a target. It deliberately does not draw the AMQP consumer as a live path.
+
+```mermaid
+sequenceDiagram
+    actor S as Shopper/API
+    participant O as orders (Now)
+    participant OB as outbox_events (Now)
+    participant DE as domain_events (Now)
+    participant RP as RabbitMQPublisher (Partial)
+    participant AMQP as order.events exchange (Partial)
+    participant I as inventory (Target)
+    participant P as payments (Target)
+    participant N as notifications (Target)
+
+    S->>O: POST /api/v1/orders
+    O->>OB: persist OrderCreated outbox event
+    O->>DE: record OrderCreated domain event
+    Note over OB: OutboxWorker exists but is not scheduled (Partial)
+    OB-->>RP: polled + published only when worker runs
+    RP-->>AMQP: publish to topic exchange
+    Note right of AMQP: No AMQP consumer is implemented yet (Target)
+    AMQP-->>I: InventoryReserved / InventoryRejected (Target choreography)
+    I-->>O: confirm or cancel order (Target)
+    O-->>P: authorize payment (Target)
+    O-->>N: send notification (Target)
+```
+
+### Order state machine
+
+The transition set below matches `can_transition` in `backend/app/modules/orders/domain/services.py` exactly, including idempotent self-transitions. See [docs/GLOSSARY.md](./docs/GLOSSARY.md) for state vocabulary.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: create order
+    pending --> pending: idempotent no-op
+    pending --> confirmed: InventoryReserved
+    pending --> cancelled: InventoryRejected
+    confirmed --> confirmed: idempotent no-op
+    cancelled --> cancelled: idempotent no-op
+```
 
 ## Architecture Decision Records
 

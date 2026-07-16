@@ -63,8 +63,8 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 5: ARCHITECTURE matrix + diagrams (W4b, PR 5, ≤400)
 
-- [ ] 4b.1 Extend `ARCHITECTURE.md`: Cross-cutting, NFRs, Current Implementation Status matrix, `sequenceDiagram`, `stateDiagram-v2`.
-- [ ] 4b.2 Validate: matrix status ∈ {implemented, partial, target}; partials never present-tense; `mmdc` all.
+- [x] 4b.1 Extend `ARCHITECTURE.md`: Cross-cutting, NFRs, Current Implementation Status matrix, `sequenceDiagram`, `stateDiagram-v2`.
+- [x] 4b.2 Validate: matrix status ∈ {implemented, partial, target}; partials never present-tense; `mmdc` all.
 
 ## Phase 6: ADR seed + index (W5, PR 6, ≤350)
 
