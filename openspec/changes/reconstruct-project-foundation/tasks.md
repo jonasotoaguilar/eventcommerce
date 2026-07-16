@@ -53,8 +53,8 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 3: GLOSSARY (W3, PR 3, ≤200)
 
-- [ ] 3.1 Create `docs/GLOSSARY.md`: Usage, Domain terms, Events table (5 rows, producer+consumer), State vocabulary, Maintenance rule.
-- [ ] 3.2 Validate: event rows == ordered `Literal[...]` in `backend/app/shared/messaging/envelope.py`.
+- [x] 3.1 Create `docs/GLOSSARY.md`: Usage, Domain terms, Events table (5 rows, producer+consumer), State vocabulary, Maintenance rule.
+- [x] 3.2 Validate: event rows == ordered `Literal[...]` in `backend/app/shared/messaging/envelope.py`.
 
 ## Phase 4: ARCHITECTURE narrative (W4a, PR 4, ≤320)
 
