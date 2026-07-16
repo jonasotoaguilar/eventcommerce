@@ -48,8 +48,8 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 2: PRD (W2, PR 2, ≤400)
 
-- [ ] 2.1 Create `PRD.md`: Vision, Problem, Personas, Journeys, MVP Target, Business rules, Non-goals, Metrics, Glossary pointer.
-- [ ] 2.2 Validate: ≥2 personas; MVP lists every commerce context; no present-tense for AMQP/catalog; `markdownlint` clean.
+- [x] 2.1 Create `PRD.md`: Vision, Problem, Personas, Journeys, MVP Target, Business rules, Non-goals, Metrics, Glossary pointer.
+- [x] 2.2 Validate: ≥2 personas; MVP lists every commerce context; no present-tense for AMQP/catalog; `markdownlint` clean.
 
 ## Phase 3: GLOSSARY (W3, PR 3, ≤200)
 
