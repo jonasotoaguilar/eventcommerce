@@ -17,7 +17,7 @@ Continue with `dependency-injector`: one container per bounded context, module-l
 | Option | Assessment |
 |--------|------------|
 | Manual constructor injection | Zero dependencies, but more boilerplate in routes and tests. |
-| dependency-injector | Already used in orders; supports scoped overrides and fits the module layout. |
+| dependency-injector | Planned for orders; supports scoped overrides and fits the module layout. |
 | Another DI framework | Would add migration cost without clear gain over the current library. |
 
 ## Consequences
