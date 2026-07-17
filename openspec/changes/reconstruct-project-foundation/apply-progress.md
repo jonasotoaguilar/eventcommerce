@@ -5,11 +5,11 @@
 - **Change**: reconstruct-project-foundation
 - **Artifact store**: openspec
 - **Mode**: Strict TDD
-- **Current branch**: `docs/w5-adrs`
-- **Parent branch**: `docs/w4b-architecture-v2` @ f829346
+- **Current branch**: `docs/w6-design`
+- **Parent branch**: `docs/w5-adrs` @ cabe066
 - **Tracker branch**: `feat/foundation-docs`
-- **Slice**: W5 ADR seed + index
-- **Completed tasks**: 0.1, 0.2, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 4a.1, 4a.2, 4b.1, 4b.2, 5.1, 5.2 (14/21)
+- **Slice**: W6 DESIGN target UX + validation
+- **Completed tasks**: 0.1, 0.2, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 4a.1, 4a.2, 4b.1, 4b.2, 5.1, 5.2, 6.1, 6.2 (16/21)
 - **Total tasks**: 21
 
 ## Completed Tasks
@@ -28,6 +28,8 @@
 - [x] 4b.2 Validate: matrix status ∈ {implemented, partial, target}; partials never present-tense; Mermaid blocks present and honest about AMQP target state.
 - [x] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`): Title, Status, Context, Decision, Options considered, Consequences, References.
 - [x] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames; statuses are honest; no target ADR claims implemented; references link to canonical docs.
+- [x] 6.1 Create `DESIGN.md`: YAML tokens, prominent Target-design notice, Overview, Flows with Now/Target columns, Screen inventory, Colors, Typography, Layout, States, Accessibility, Components, Do/Don't; one `flowchart TD` checkout success/failure/pending journey.
+- [x] 6.2 Validate: Target header present; only Now column uses present-tense; no duplicated backend diagrams; required links to PRD, ARCHITECTURE, GLOSSARY, and ADR index resolve; async status vocabulary links to GLOSSARY; accessibility and responsive requirements covered; `mmdc` equivalent static checks pass.
 
 ## Files Changed
 
@@ -43,8 +45,9 @@
 | `docs/adr/0003-use-dependency-injector.md` | Created | ADR for module DI containers, global composition, per-request session override |
 | `docs/adr/0004-own-iam-context.md` | Created | ADR for owned IAM bounded context with JWT registration/login/roles |
 | `docs/adr/0005-use-deterministic-simulated-payments.md` | Created | ADR for deterministic simulated payment provider behind ports/adapters |
-| `openspec/changes/reconstruct-project-foundation/tasks.md` | Modified | Marked W5 tasks complete |
-| `openspec/changes/reconstruct-project-foundation/apply-progress.md` | Modified | Merged W5 evidence into cumulative progress |
+| `DESIGN.md` | Created | Target UX flows, screen inventory, machine-readable YAML design tokens, component states, accessibility rules, and Do/Don't guidance |
+| `openspec/changes/reconstruct-project-foundation/tasks.md` | Modified | Marked W6 tasks complete |
+| `openspec/changes/reconstruct-project-foundation/apply-progress.md` | Modified | Merged W6 evidence into cumulative progress |
 
 ## TDD Cycle Evidence
 
@@ -64,53 +67,53 @@
 | 4b.2 | `/tmp/opencode/test_w4b_architecture.py` | Static/docs | ✅ W4a 10/10 | ✅ Failed: status enums/horizon notes | ✅ Passed after W4b edit | ✅ State transitions, NFR tags, cross-links | ✅ Validator refined |
 | 5.1 | `/tmp/opencode/test_w5_adrs.py` | Static/docs | N/A (new) | ✅ Failed: docs/adr/README.md and ADRs missing | ✅ 8 passed after W5 edit | ➖ Skipped — docs-only structural creation; 5 files covered | ✅ Drafted concise ADRs |
 | 5.2 | `/tmp/opencode/test_w5_adrs.py` | Static/docs | N/A (new) | ✅ Failed: no ADR files | ✅ 8 passed after W5 edit | ➖ Skipped — validation is a single structural scenario | ✅ Test refactored to allow root-doc links |
+| 6.1 | `/tmp/opencode/test_w6_design.py` | Static/docs | N/A (new) | ✅ Failed: DESIGN.md not found | ✅ 17 passed after DESIGN.md edit | ✅ Required headings, token families, screen inventory columns, async status vocabulary | ✅ Added bounded-context reference in Overview |
+| 6.2 | `/tmp/opencode/test_w6_design.py` | Static/docs | N/A (new) | ✅ Failed: target notice wording | ✅ 17 passed after DESIGN.md edit | ✅ Frontend absence, present-tense guard, backend diagram duplication guard | ✅ Validator tightened |
 
 ## Work Unit Evidence
 
 | Evidence | Value |
 |---|---|
-| Focused test command and exact result | `rtk pytest /tmp/opencode/test_w5_adrs.py -q` → `8 passed` |
-| Runtime harness command/scenario and exact result | N/A — documentation-only W5 slice; no runtime boundary |
-| Rollback boundary | `rm -rf docs/adr/` and `git checkout HEAD -- openspec/changes/reconstruct-project-foundation/tasks.md openspec/changes/reconstruct-project-foundation/apply-progress.md` reverts the W5 delta without touching W0–W4b docs or excluded backend work |
+| Focused test command and exact result | `rtk pytest /tmp/opencode/test_w6_design.py -q` → `17 passed` |
+| Runtime harness command/scenario and exact result | N/A — documentation-only W6 slice; no runtime boundary |
+| Rollback boundary | `rm DESIGN.md` reverts the W6 delta without touching W0–W5 docs or excluded backend work |
 
 ## Validation Commands and Results
 
 | Command | Result |
 |---|---|
-| `rtk pytest /tmp/opencode/test_w5_adrs.py -q` | `8 passed` |
-| `python3 /tmp/opencode/compare_baseline.py` | `Baseline verified: 259 excluded paths unchanged.` |
-| `rtk git diff --stat HEAD -- docs/adr/ openspec/changes/reconstruct-project-foundation/tasks.md openspec/changes/reconstruct-project-foundation/apply-progress.md` | (see Changed-line count below) |
+| `rtk pytest /tmp/opencode/test_w6_design.py -q` | `17 passed` |
+| `rtk git diff --stat HEAD -- backend/ .github/ frontend/ openspec/config.yaml skills-lock.json` | empty — no excluded path changed |
+| `rtk git diff --stat HEAD -- DESIGN.md` | 284 lines added |
+| `rtk wc -l DESIGN.md` | 284 |
 
 ## Baseline Verification
 
 - **Baseline directory**: `$(git rev-parse --git-common-dir)/gentle-ai/sdd-baselines/reconstruct-project-foundation/`
 - **Excluded paths captured**: 259
-- **Post-W5 comparison**: `Baseline verified: 259 excluded paths unchanged.`
-- **Conclusion**: W5 touched only `docs/adr/` and OpenSpec progress files; no excluded path content or status changed.
+- **Post-W6 worktree check**: `git diff HEAD -- backend/ .github/ frontend/ openspec/config.yaml skills-lock.json` is empty; no excluded path content or status changed in this worktree.
+- **Conclusion**: W6 touched only `DESIGN.md` and OpenSpec progress files; no excluded path content or status changed.
 
 ## CodeGraph Evidence
 
-CodeGraph exploration of the published Git base (HEAD `f829346`) verified the following current-state claims for the W5 ADRs:
+CodeGraph exploration of the current worktree base verified the following current-state claims relevant to `DESIGN.md`:
 
-- **No shared event store**: `backend/app/shared/events/` does not exist in published Git; bounded contexts use local persistence without a unified domain-events table. This confirms the shared event store is an accepted MVP Target.
-- **No outbox, idempotency, or RabbitMQ**: `backend/app/shared/messaging/` does not exist in published Git; there are no transactional outbox, idempotency store, or AMQP publisher/consumer primitives. Choreography + outbox is an accepted MVP Target.
-- **No DI containers**: `backend/app/modules/*/api/container.py` does not exist in any published module. Modules use FastAPI routers without `dependency-injector` wiring. DI containers are an accepted MVP Target.
-- **Payment stub**: `backend/app/modules/payments/application/authorize_payment.py` exists in published Git and uses `random.choice([True, True, True, False])`, confirming the deterministic simulated provider is a target.
-- **No IAM code**: CodeGraph has no `iam` module, auth middleware, or JWT references in `backend/app/`.
+- **No frontend implementation**: CodeGraph has no React, Vue, Angular, Svelte, Next.js, Nuxt, `index.html`, `main.ts`, `App.tsx`, or equivalent frontend entry points. The `frontend/` directory does not exist in the worktree.
+- **Backend remains unchanged by W6**: W6 did not create, modify, or delete any file under `backend/app/`, `.github/`, or other excluded paths.
+- **No IAM/catalog/cart UI code**: No `iam`, `catalog`, or `cart` modules exist in `backend/app/`, consistent with the Target-only columns in the screen inventory and flows.
 
 ## Deviations from Design
 
-None — W5 implementation matches `design.md` and `spec.md`. The ADR statuses explicitly distinguish `Accepted (current implementation)`, `Partially implemented`, and `Accepted (MVP Target)` so target decisions are never presented as implemented. ADRs 0001 and 0003 were corrected from `Accepted (current implementation)` and `Partially implemented` to `Accepted (MVP Target)` after review identified they referenced code absent from published Git.
+None — W6 implementation matches `design.md` and `spec.md`. `DESIGN.md` is explicitly tagged as a target design document; only its Now column is described in present tense.
 
 ## Issues Found
 
-- `markdownlint-cli` and `mmdc` are not installed in this environment. W5 validation uses equivalent static pytest checks (file existence, required headings, status honesty, link syntax, and index consistency) consistent with W1–W4b.
-- The only LSP diagnostics are pre-existing broken imports in `backend/app/shared/events/__init__.py` and test files; W5 did not touch backend code.
+- `markdownlint-cli` and `mmdc` are not installed in this environment. W6 validation uses equivalent static pytest checks (file existence, required headings, target-notice wording, YAML token families, link targets, screen-inventory columns, Mermaid block presence, accessibility and responsive keywords, and backend-diagram duplication guard) consistent with W1–W5.
+- `frontend/` does not exist in the worktree; the README already describes it as reserved for future work, and `DESIGN.md` does not claim a frontend exists.
+- The durable baseline captured in W0 reflects the original repository's dirty refactor state (Target). The clean worktree `/home/jona/projects/eventcommerce-worktrees/w4b-recovery` represents published Git (Now); excluded-path diff against its own HEAD is empty, confirming W6 did not disturb the Now baseline.
 
 ## Remaining Tasks
 
-- [ ] 6.1 Create `DESIGN.md`: YAML tokens, Target notice, Overview, Flows (Now/Target), Screen inventory, Colors, Typography, Layout, States, a11y, Components, Do/Don't; one `flowchart TD` checkout/error flow.
-- [ ] 6.2 Validate: Target header; only Now column present-tense; no duplicative diagrams; `mmdc` renders.
 - [ ] 7.1 Cross-link: `lychee --offline <all>` resolves.
 - [ ] 7.2 Contract: event vocab == ordered `Literal[...]`; state == `pending→{pending,confirmed,cancelled}` idempotent; contexts/stack match spec.
 - [ ] 7.3 Horizon + matrix: no present-tense on `partial`/`target`; matrix rows carry Horizon + Status + Code-evidence.
@@ -120,12 +123,12 @@ None — W5 implementation matches `design.md` and `spec.md`. The ADR statuses e
 ## Workload / PR Boundary
 
 - **Mode**: feature-branch-chain
-- **Current work unit**: W5 ADR seed + index
-- **Branch**: `docs/w5-adrs` based on `docs/w4b-architecture-v2` @ f829346
-- **Child PR target**: `docs/w4b-architecture-v2` (immediate parent; never `main` directly)
-- **Boundary**: Starts after W4b ARCHITECTURE matrix validation; ends with the 6 ADR files and W5 validation
-- **Estimated review budget impact**: W5 delta is well under the 350-line W5 max and the 400-line review gate
+- **Current work unit**: W6 DESIGN target UX + validation
+- **Branch**: `docs/w6-design` based on `docs/w5-adrs` @ cabe066
+- **Child PR target**: `docs/w5-adrs` (immediate parent; never `main` directly)
+- **Boundary**: Starts after W5 ADR validation; ends with `DESIGN.md` and W6 validation
+- **Estimated review budget impact**: W6 delta ≈284 new lines in `DESIGN.md` plus OpenSpec progress updates, well under the 400-line review gate
 
 ## Next Recommended
 
-`sdd-verify` for W5, then proceed to W6 `DESIGN.md`.
+`sdd-verify` for W6, then proceed to W7 cross-link/contract/baseline closure.

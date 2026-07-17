@@ -73,8 +73,8 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 7: DESIGN (W6, PR 7, ≤400)
 
-- [ ] 6.1 Create `DESIGN.md`: YAML tokens, Target notice, Overview, Flows (Now/Target), Screen inventory, Colors, Typography, Layout, States, a11y, Components, Do/Don't; one `flowchart TD` checkout/error flow.
-- [ ] 6.2 Validate: Target header; only Now column present-tense; no duplicative diagrams; `mmdc` renders.
+- [x] 6.1 Create `DESIGN.md`: YAML tokens, Target notice, Overview, Flows (Now/Target), Screen inventory, Colors, Typography, Layout, States, a11y, Components, Do/Don't; one `flowchart TD` checkout/error flow.
+- [x] 6.2 Validate: Target header; only Now column present-tense; no duplicative diagrams; `mmdc` renders.
 
 ## Phase 8: Cross-link + Contract + Baseline Closure (W7, verify gate, no PR)
 
