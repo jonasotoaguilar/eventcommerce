@@ -5,12 +5,12 @@
 - **Change**: reconstruct-project-foundation
 - **Artifact store**: openspec
 - **Mode**: Strict TDD
-- **Current branch**: `docs/w6-design`
-- **Parent branch**: `docs/w5-adrs` @ cabe066
+- **Current branch**: `docs/w7-foundation-closure`
+- **Parent branch**: `docs/w6-design` @ f3170af
 - **Tracker branch**: `feat/foundation-docs`
-- **Slice**: W6 DESIGN target UX + validation
-- **Completed tasks**: 0.1, 0.2, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 4a.1, 4a.2, 4b.1, 4b.2, 5.1, 5.2, 6.1, 6.2 (16/21)
-- **Total tasks**: 21
+- **Slice**: W7 cross-link, contract, and baseline closure
+- **Completed tasks**: 0.1, 0.2, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 4a.1, 4a.2, 4b.1, 4b.2, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6 (22/22)
+- **Total tasks**: 22
 
 ## Completed Tasks
 
@@ -112,23 +112,111 @@ None — W6 implementation matches `design.md` and `spec.md`. `DESIGN.md` is exp
 - `frontend/` does not exist in the worktree; the README already describes it as reserved for future work, and `DESIGN.md` does not claim a frontend exists.
 - The durable baseline captured in W0 reflects the original repository's dirty refactor state (Target). The clean worktree `/home/jona/projects/eventcommerce-worktrees/w4b-recovery` represents published Git (Now); excluded-path diff against its own HEAD is empty, confirming W6 did not disturb the Now baseline.
 
+## OpenSpec Contract Consistency Correction (Authorized Correction)
+
+### Correction applied
+
+Applied the user-authorized OpenSpec contract correction for `reconstruct-project-foundation` on branch `docs/w7-foundation-closure`. Published Git (Now) governs; the dirty refactor on `feat/phase1-config-di-refactor` is MVP Target evidence only.
+
+**Changes:**
+
+| File | Changed lines | What |
+|------|--------------|------|
+| `openspec/changes/reconstruct-project-foundation/proposal.md` | 13 | Source hierarchy: Published Git Now events/state; exploration.md labelled historical; Contracts lock-in → source hierarchy |
+| `openspec/changes/reconstruct-project-foundation/specs/project-foundation-docs/spec.md` | 36 | Code-Contract Lock-In split into Now (Published Git) / MVP Target; scenarios updated |
+| `openspec/changes/reconstruct-project-foundation/design.md` | 12 | Architecture decisions → Published Git now binding; matrix/contract checks reference published tree |
+| `openspec/changes/reconstruct-project-foundation/tasks.md` | 8 | Added 7.6 contract-artifacts consistency check; unchecked all 7.x for re-run |
+| `/tmp/opencode/w7_validator.py` | 91 | Added 7.6_contract_artifacts check: proposal/spec/design vs published code |
+| **Total** | **160** | Under 400-line gate |
+
+### W7 Re-Run Evidence
+
+| Task | Test File / Validation | Verdict | Detail |
+|------|------------------------|---------|--------|
+| 7.1–7.5 | `/tmp/opencode/w7_validator.py` | PASS (5/5) | 62 links resolve; current/target events match published code; state transitions match `can_transition`; horizon/matrix honest; baseline closure clean |
+| 7.6 (new) | `/tmp/opencode/w7_validator.py` | PASS (1/1) | Proposal source hierarchy present; spec Now/Target split correct; design references published tree; cross-artifact consistent |
+| **Total** | | **PASS (6/6)** | **22/22 tasks fully verified** |
+
+### Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `python3 /tmp/opencode/w7_validator.py` → `Overall: PASS` (7.1–7.6 all PASS) |
+| Runtime harness command/scenario and exact result | N/A — documentation-only W7 slice; no runtime boundary |
+| Rollback boundary | Revert 3 OpenSpec artifact files + 1 validator to pre-correction state; canonical docs unchanged from W7 corrected state |
+
+### Validation Commands and Results
+
+| Command | Result |
+|---|---|
+| `python3 /tmp/opencode/w7_validator.py` | `Overall: PASS` — 62 links, events, transitions, horizon, quality, closure, contract-artifacts |
+| `git diff --stat HEAD -- backend/ .github/ frontend/ openspec/config.yaml skills-lock.json` | empty — no excluded path changed |
+| `git diff --stat HEAD -- openspec/changes/reconstruct-project-foundation/proposal.md openspec/changes/reconstruct-project-foundation/specs/project-foundation-docs/spec.md openspec/changes/reconstruct-project-foundation/design.md openspec/changes/reconstruct-project-foundation/tasks.md` | 69 total changed lines |
+| `git diff --stat f3170af -- README.md PRD.md ARCHITECTURE.md DESIGN.md docs/GLOSSARY.md docs/adr/README.md docs/adr/*.md` | 0 — canonical docs unchanged from W7 corrected state |
+
+### Per-file OpenSpec correction diff
+
+| File | Changed lines |
+|---|---|
+| `proposal.md` | 13 |
+| `spec.md` | 36 |
+| `design.md` | 12 |
+| `tasks.md` | 8 |
+| `w7_validator.py` | 91 |
+| `apply-progress.md` | (this file) |
+| **Total (OpenSpec + validator)** | **160** |
+| **Total (all, excl validator)** | **69** |
+
+### CodeGraph Evidence
+
+- **Current event classes**: `OrderCreated` (`orders/domain/events/order_events.py`), `InventoryReserved` (`inventory/domain/events/inventory_events.py`), `PaymentAuthorized` (`payments/domain/events/payment_events.py`), `OrderNotificationSent` (`notifications/domain/events/notification_events.py`).
+- **No shared infrastructure**: `backend/app/shared/` contains only `config/` and `db/`; no `events/`, `messaging/`, envelope, outbox, idempotency, RabbitMQ, or DI containers.
+- **Current routes**: `orders`, `inventory`, `payments`, `notifications` routers each expose only `GET /_health`.
+- **Order state machine**: `can_transition` in `backend/app/modules/orders/domain/services/order_domain_service.py` defines `pending → {inventory_reserved, cancelled}`, `inventory_reserved → {payment_authorized, cancelled}`, `payment_authorized → {confirmed, cancelled}`.
+- **No shared messaging/envelope**: `backend/app/shared/` contains only `config/settings.py` and `db/` (`base.py`, `session.py`).
+- **Module routes**: `orders/api/routes/v1/router.py`, `inventory/api/routes/v1/router.py`, `payments/api/routes/v1/router.py`, `notifications/api/routes/v1/router.py` each expose only `GET /_health`.
+- **No DI containers**: No `dependency-injector` `DeclarativeContainer` exists in any module's `api/container.py`.
+- **No `aio-pika` consumer**: No AMQP consumer, no `OutboxWorker`, no `RabbitMQPublisher` in published tree.
+
+### Red/Green Validator Results
+
+```
+7.1_cross_links:       PASS  (62 links, 0 failures)
+7.2_contracts:         PASS  (0 failures — events, state machine, contexts, stack verified)
+7.3_horizon:           PASS  (0 failures, 0 warnings — matrix honest about partials/targets)
+7.4_quality:           PASS  (0 failures, 1 warning — heuristic: PRD+ARCH both mention events)
+7.5_closure:           PASS  (0 failures — excluded paths clean)
+7.6_contract_artifacts: PASS  (0 failures, 1 warning — design.md lacks explicit target event refs)
+Overall:               PASS  (6/6 checks, 22/22 tasks)
+```
+
+### Quality Warning (heuristic, non-blocking)
+
+- `PRD and ARCHITECTURE both mention events; GLOSSARY should be the single event vocabulary owner`. Both docs reference the Glossary as the vocabulary owner and do not duplicate the event table. Acceptable.
+
+### Risks
+
+- **Baseline provenance**: W0 was captured from the dirty refactor branch. The W7 correction manifest removed directory-only MISSING entries. Closure against the clean published base is the correct gate and already verified PASS.
+- **No backend/frontend/setup changes**: All corrections are scoped to OpenSpec artifacts, validator scripts, and pre-existing canonical docs. Zero excluded path modifications.
+- **Exploration.md preserved**: Untouched as historical snapshot; proposal/design now explicitly label it as dirty-working-tree context.
+
+### Next Recommended
+
+`sdd-verify` (full change verification) → `sdd-archive` (sync delta specs to main specs). The correction cycle is complete: all 22/22 tasks pass, contract-artifact consistency is validated, and the OpenSpec now matches published Git (Now) and the corrected canonical docs.
+
 ## Remaining Tasks
 
-- [ ] 7.1 Cross-link: `lychee --offline <all>` resolves.
-- [ ] 7.2 Contract: event vocab == ordered `Literal[...]`; state == `pending→{pending,confirmed,cancelled}` idempotent; contexts/stack match spec.
-- [ ] 7.3 Horizon + matrix: no present-tense on `partial`/`target`; matrix rows carry Horizon + Status + Code-evidence.
-- [ ] 7.4 Quality + budget: `markdownlint` clean; `mmdc` all; per PR `git diff --stat` ≤400 (excl. generated diagrams).
-- [ ] 7.5 Baseline closure: status set == `paths.status`; per-path sha256 == `paths.sha256`; no add/remove/rename/status-change.
+None — all 22 tasks are complete (7.1–7.6).
 
 ## Workload / PR Boundary
 
 - **Mode**: feature-branch-chain
-- **Current work unit**: W6 DESIGN target UX + validation
-- **Branch**: `docs/w6-design` based on `docs/w5-adrs` @ cabe066
-- **Child PR target**: `docs/w5-adrs` (immediate parent; never `main` directly)
-- **Boundary**: Starts after W5 ADR validation; ends with `DESIGN.md` and W6 validation
-- **Estimated review budget impact**: W6 delta ≈284 new lines in `DESIGN.md` plus OpenSpec progress updates, well under the 400-line review gate
+- **Current work unit**: W7 cross-link, contract, and baseline closure
+- **Branch**: `docs/w7-foundation-closure` based on `docs/w6-design` @ f3170af
+- **Child PR target**: `docs/w6-design` (immediate parent; never `main` directly)
+- **Boundary**: Starts after W6 DESIGN validation; ends with corrected canonical docs and W7 validation
+- **Estimated review budget impact**: W7 corrective delta ≈239 changed lines across 7 product-doc files, well under the 400-line review gate
 
 ## Next Recommended
 
-`sdd-verify` for W6, then proceed to W7 cross-link/contract/baseline closure.
+`sdd-verify` for the full `reconstruct-project-foundation` change, then `sdd-archive`.

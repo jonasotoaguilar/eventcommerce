@@ -20,17 +20,17 @@ Event-driven systems quickly become hard to reason about when vocabulary, owners
 | Persona | Journey | Outcome |
 |---|---|---|
 | Shopper | Register, log in, browse catalog, add to cart, checkout | Order created with reserved inventory and authorized payment |
-| Shopper | Receive order status updates | Sees `pending`, `confirmed`, or `cancelled` with a reason |
+| Shopper | Receive order status updates | Sees `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, or `cancelled` with a reason |
 | Store Operator | List products, adjust stock, review orders | Catalog and inventory remain consistent across events |
 | Store Operator | Inspect payment decisions | Same inputs always produce the same authorization result in the MVP simulation |
 
 ## Now
 
-- Python backend scaffold with `orders`, `inventory`, `payments`, and `notifications` bounded contexts.
-- Shared event envelope, idempotency primitives, and transactional outbox models in `backend/app/shared/messaging/`.
-- Order state model supports `pending`, `confirmed`, and `cancelled`.
+- Python backend scaffold in `backend/app/` with `orders`, `inventory`, `payments`, and `notifications` bounded contexts; each module currently exposes only a `GET /_health` route.
+- Order aggregate supports `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, and `cancelled`; no checkout orchestrator exists.
+- No shared event envelope, transactional outbox, idempotency store, RabbitMQ publisher, or `dependency-injector` containers exist in the published tree.
 - Payment authorization is currently a non-deterministic stub: `random.choice([True, True, True, False])`.
-- **Not yet live**: AMQP consumer, outbox worker/scheduler, IAM, catalog, cart, and frontend.
+- **Not yet live**: AMQP consumer, outbox worker/scheduler, IAM, catalog, cart, checkout, shared messaging, and frontend.
 
 ## MVP Target
 
@@ -39,7 +39,7 @@ A full commerce journey on a single event-driven backend:
 - **IAM** as an owned bounded context with JWT registration, login, and role authorization.
 - **Catalog** and **Cart** contexts for product browsing and purchase collection.
 - **Checkout** orchestrating cart, inventory, and payment in one request.
-- **Orders** context with the existing `pending`, `confirmed`, `cancelled` state machine.
+- **Orders** context with a state machine supporting `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, and `cancelled`.
 - **Inventory** context reserving and releasing stock through events.
 - **Payments** context behind ports/adapters with a **deterministic simulated provider**.
 - **Notifications** context reacting to order events.
@@ -56,7 +56,7 @@ A full commerce journey on a single event-driven backend:
 - A checkout can only be submitted when every cart line has available inventory.
 - Inventory is reserved before payment authorization is attempted.
 - Payment authorization in the MVP must be deterministic: identical inputs always return the same result.
-- Order state transitions are `pending` → `confirmed` or `pending` → `cancelled`; no other transitions are allowed.
+- Order state transitions are `pending` → `{inventory_reserved, cancelled}`, `inventory_reserved` → `{payment_authorized, cancelled}`, and `payment_authorized` → `{confirmed, cancelled}`; no other transitions are allowed.
 - Consumers must be idempotent: processing the same event twice must not duplicate side effects.
 - JWT tokens carry roles; role authorization is enforced at API boundaries.
 
@@ -70,7 +70,7 @@ A full commerce journey on a single event-driven backend:
 
 ## Metrics
 
-- **Order state correctness**: 100% of simulated orders end in a valid terminal state with the expected event sequence.
+- **Order state correctness**: 100% of simulated orders end in a valid terminal state following the transitions in `backend/app/modules/orders/domain/services/order_domain_service.py`.
 - **Payment simulation reproducibility**: a fixed input set produces the same authorization result across 100 repeated runs.
 - **Consumer idempotency**: replaying the same event batch produces no duplicate inventory or payment records.
 - **End-to-end checkout latency**: p95 under 500 ms for the deterministic MVP path in local tests.

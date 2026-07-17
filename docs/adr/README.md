@@ -1,6 +1,8 @@
 # Architecture Decision Records
 
-Significant architecture and product decisions for EventCommerce. Each record is a decision, not a log entry.
+## Purpose
+
+This directory records significant architecture and product decisions for EventCommerce. Each record is a decision, not a log entry.
 
 ## Status rules
 
