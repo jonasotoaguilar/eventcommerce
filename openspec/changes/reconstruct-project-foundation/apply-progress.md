@@ -5,12 +5,12 @@
 - **Change**: reconstruct-project-foundation
 - **Artifact store**: openspec
 - **Mode**: Strict TDD
-- **Current branch**: `docs/w4b-architecture`
+- **Current branch**: `docs/w5-adrs`
+- **Parent branch**: `docs/w4b-architecture-v2` @ f829346
 - **Tracker branch**: `feat/foundation-docs`
-- **Slice**: W4b ARCHITECTURE matrix + diagrams
-- **Completed tasks**: 0.1, 0.2, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 4a.1, 4a.2, 4b.1, 4b.2 (12/21)
+- **Slice**: W5 ADR seed + index
+- **Completed tasks**: 0.1, 0.2, 1.1, 1.2, 2.1, 2.2, 3.1, 3.2, 4a.1, 4a.2, 4b.1, 4b.2, 5.1, 5.2 (14/21)
 - **Total tasks**: 21
-- **Changed lines**: W4b `ARCHITECTURE.md` +111 lines; `tasks.md` +2 checkbox updates; `apply-progress.md` metadata update
 
 ## Completed Tasks
 
@@ -22,10 +22,12 @@
 - [x] 2.2 Validate: ≥2 personas; MVP lists every commerce context; no present-tense for AMQP/catalog; `markdownlint` clean.
 - [x] 3.1 Create `docs/GLOSSARY.md`: Usage, Domain terms, Events table (5 rows, producer+consumer), State vocabulary, Maintenance rule.
 - [x] 3.2 Validate: event rows == ordered `Literal[...]` in `backend/app/shared/messaging/envelope.py`.
-- [x] 4a.1 Create `ARCHITECTURE.md` narrative: Overview, Topology (`flowchart LR`), Bounded contexts, Patterns, ADR index (planned paths), DESIGN link.
+- [x] 4a.1 Create `ARCHITECTURE.md` narrative: Overview, Topology, Bounded contexts, Patterns, ADR index (planned paths), DESIGN link.
 - [x] 4a.2 Validate: ADR index planned paths; DESIGN link planned; Mermaid `flowchart LR` present and scoped to W4a.
 - [x] 4b.1 Extend `ARCHITECTURE.md`: Cross-cutting concerns, NFRs, Current Implementation Status matrix with `Decision | Horizon | Status | Code evidence | Doc location`, `sequenceDiagram`, `stateDiagram-v2`.
 - [x] 4b.2 Validate: matrix status ∈ {implemented, partial, target}; partials never present-tense; Mermaid blocks present and honest about AMQP target state.
+- [x] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`): Title, Status, Context, Decision, Options considered, Consequences, References.
+- [x] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames; statuses are honest; no target ADR claims implemented; references link to canonical docs.
 
 ## Files Changed
 
@@ -34,9 +36,15 @@
 | `README.md` | Modified | Replaced 1-line placeholder with blueprint README |
 | `PRD.md` | Created | Product Requirements Document with vision, personas, MVP scope, business rules, non-goals, and metrics |
 | `docs/GLOSSARY.md` | Created | Canonical domain/event vocabulary, bounded contexts, event table, state transitions, maintenance rules |
-| `ARCHITECTURE.md` | Created / Modified | W4a: narrative topology diagram, bounded contexts, patterns, ADR index placeholder, DESIGN link; W4b: cross-cutting concerns, measurable NFRs, current implementation status matrix, sequenceDiagram, stateDiagram-v2 |
-| `openspec/changes/reconstruct-project-foundation/tasks.md` | Modified | Marked W0/W1/W2/W3/W4a/W4b tasks complete |
-| `openspec/changes/reconstruct-project-foundation/apply-progress.md` | Modified | Merged W4b evidence into cumulative progress |
+| `ARCHITECTURE.md` | Created / Modified | W4a narrative topology diagram, bounded contexts, patterns, ADR index placeholder, DESIGN link; W4b cross-cutting concerns, measurable NFRs, current implementation status matrix, sequenceDiagram, stateDiagram-v2 |
+| `docs/adr/README.md` | Created | ADR index: purpose, status rules, numbered index, Now/MVP Target/Future interpretation |
+| `docs/adr/0001-use-shared-event-store.md` | Created | ADR for shared event store vs per-module tables |
+| `docs/adr/0002-use-choreography.md` | Created | ADR for event choreography + outbox/idempotency; why not orchestrated saga initially |
+| `docs/adr/0003-use-dependency-injector.md` | Created | ADR for module DI containers, global composition, per-request session override |
+| `docs/adr/0004-own-iam-context.md` | Created | ADR for owned IAM bounded context with JWT registration/login/roles |
+| `docs/adr/0005-use-deterministic-simulated-payments.md` | Created | ADR for deterministic simulated payment provider behind ports/adapters |
+| `openspec/changes/reconstruct-project-foundation/tasks.md` | Modified | Marked W5 tasks complete |
+| `openspec/changes/reconstruct-project-foundation/apply-progress.md` | Modified | Merged W5 evidence into cumulative progress |
 
 ## TDD Cycle Evidence
 
@@ -54,84 +62,70 @@
 | 4a.2 | `/tmp/opencode/validate_w4a_architecture.py` | Static/docs | N/A (new) | ✅ Failed: W4b diagrams present in W4a | ✅ Passed | ✅ Added scope guard for sequenceDiagram/stateDiagram-v2, partial honesty checks | ✅ Validator tightened |
 | 4b.1 | `/tmp/opencode/test_w4b_architecture.py` | Static/docs | ✅ W4a 10/10 | ✅ Failed: missing matrix/diagrams/NFRs | ✅ Passed after W4b edit | ✅ Matrix rows, evidence paths, diagrams | ✅ Content tightened, validator normalized separators |
 | 4b.2 | `/tmp/opencode/test_w4b_architecture.py` | Static/docs | ✅ W4a 10/10 | ✅ Failed: status enums/horizon notes | ✅ Passed after W4b edit | ✅ State transitions, NFR tags, cross-links | ✅ Validator refined |
+| 5.1 | `/tmp/opencode/test_w5_adrs.py` | Static/docs | N/A (new) | ✅ Failed: docs/adr/README.md and ADRs missing | ✅ 8 passed after W5 edit | ➖ Skipped — docs-only structural creation; 5 files covered | ✅ Drafted concise ADRs |
+| 5.2 | `/tmp/opencode/test_w5_adrs.py` | Static/docs | N/A (new) | ✅ Failed: no ADR files | ✅ 8 passed after W5 edit | ➖ Skipped — validation is a single structural scenario | ✅ Test refactored to allow root-doc links |
 
 ## Work Unit Evidence
 
 | Evidence | Value |
 |---|---|
-| Focused test command and exact result | `python3 -m pytest /tmp/opencode/test_w4b_architecture.py -q` → `10 passed in 0.02s` |
-| Runtime harness command/scenario and exact result | N/A — documentation-only W4b slice; no runtime boundary |
-| Rollback boundary | `git checkout HEAD -- ARCHITECTURE.md` and `git checkout HEAD -- openspec/changes/reconstruct-project-foundation/tasks.md` reverts the W4b delta without touching W4a narrative or excluded backend work |
+| Focused test command and exact result | `rtk pytest /tmp/opencode/test_w5_adrs.py -q` → `8 passed` |
+| Runtime harness command/scenario and exact result | N/A — documentation-only W5 slice; no runtime boundary |
+| Rollback boundary | `rm -rf docs/adr/` and `git checkout HEAD -- openspec/changes/reconstruct-project-foundation/tasks.md openspec/changes/reconstruct-project-foundation/apply-progress.md` reverts the W5 delta without touching W0–W4b docs or excluded backend work |
 
 ## Validation Commands and Results
 
 | Command | Result |
 |---|---|
-| `python3 /tmp/opencode/capture_baseline.py` | `Baseline captured: 259 paths -> $(git rev-parse --git-common-dir)/gentle-ai/sdd-baselines/reconstruct-project-foundation` |
+| `rtk pytest /tmp/opencode/test_w5_adrs.py -q` | `8 passed` |
 | `python3 /tmp/opencode/compare_baseline.py` | `Baseline verified: 259 excluded paths unchanged.` |
-| `python3 /tmp/opencode/validate_w1_readme.py` | `README W1 validation passed.` |
-| `python3 /tmp/opencode/validate_w2_prd.py` | `PRD W2 validation passed.` |
-| `python3 /tmp/opencode/validate_w3_glossary.py` | `GLOSSARY W3 validation passed.` |
-| `python3 /tmp/opencode/validate_w4a_architecture.py` | `ARCHITECTURE W4a validation passed.` |
-| `python3 -m pytest /tmp/opencode/test_w4b_architecture.py -q` | `10 passed in 0.02s` |
-| `git diff --stat HEAD -- ARCHITECTURE.md` | `ARCHITECTURE.md \| 111 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++` |
-| `wc -l ARCHITECTURE.md` | `273` (W4a 165 + W4b 108 net) |
+| `rtk git diff --stat HEAD -- docs/adr/ openspec/changes/reconstruct-project-foundation/tasks.md openspec/changes/reconstruct-project-foundation/apply-progress.md` | (see Changed-line count below) |
 
 ## Baseline Verification
 
 - **Baseline directory**: `$(git rev-parse --git-common-dir)/gentle-ai/sdd-baselines/reconstruct-project-foundation/`
 - **Excluded paths captured**: 259
-- **Untracked**: 47; **Deleted**: 84; **Modified**: 15
-- **Post-W1 comparison**: 0 status changes, 0 content changes among excluded paths
-- **Post-W2 comparison**: 0 status changes, 0 content changes among excluded paths
-- **Post-W3 comparison**: 0 status changes, 0 content changes among excluded paths
-- **Post-W4a comparison**: 0 content changes among excluded paths; 5 directory-existence mismatches are pre-existing from the pending `feat/phase1-config-di-refactor` refactor and were not introduced by W4a.
-- **Post-W4b comparison**: 0 content changes among excluded paths; W4b touched only `ARCHITECTURE.md`, `openspec/.../tasks.md`, and `openspec/.../apply-progress.md`.
-- **Conclusion**: No excluded path content was changed by W4b.
+- **Post-W5 comparison**: `Baseline verified: 259 excluded paths unchanged.`
+- **Conclusion**: W5 touched only `docs/adr/` and OpenSpec progress files; no excluded path content or status changed.
 
 ## CodeGraph Evidence
 
-CodeGraph exploration verified the following current-state claims in `ARCHITECTURE.md`:
+CodeGraph exploration of the published Git base (HEAD `f829346`) verified the following current-state claims for the W5 ADRs:
 
-- **Bounded contexts and API surface**: `backend/app/api/v1/router.py` composes `orders`, `inventory`, `payments`, and `notifications` routers. Only `orders` has real routes (`POST /`, `GET /{order_id}`, `GET /{order_id}/timeline`); the other three expose only `GET /_health`.
-- **Dependency injection**: `OrdersContainer` wires `SqlAlchemyOrderRepository`, `SqlAlchemyEventRepository`, and `SqlAlchemyOutboxRepository` into use cases. `InventoryContainer`, `PaymentsContainer`, and `NotificationsContainer` are empty `DeclarativeContainer` subclasses.
-- **Event store**: `backend/app/shared/events/event_repository.py` implements `SqlAlchemyEventRepository` with `add()` and `get_timeline()` against `DomainEventModel`.
-- **Outbox and idempotency**: `backend/app/shared/messaging/outbox_repository.py` (save/get_pending/mark_published), `idempotency.py` (`ProcessedEventStore.is_processed`/`mark_processed`), and `models.py` (`OutboxEventModel`, `ProcessedEventModel`).
-- **RabbitMQ publisher**: `backend/app/shared/messaging/rabbitmq_publisher.py` publishes to the `order.events` topic exchange but is not wired to the FastAPI lifespan in `backend/app/app.py`.
-- **Event envelope**: `backend/app/shared/messaging/envelope.py` defines the canonical `Literal["OrderCreated", "InventoryReserved", "InventoryRejected", "OrderConfirmed", "OrderCancelled"]` vocabulary.
-- **Order state machine**: `backend/app/modules/orders/domain/services.py` (`can_transition`) and `backend/app/modules/orders/domain/entities.py` enforce `pending → {pending, confirmed, cancelled}` with idempotent self-transitions on `confirmed` and `cancelled`.
-- **Payment stub**: `backend/app/modules/payments/application/authorize_payment.py` still uses a non-deterministic `random.choice` stub, confirming the deterministic simulated provider is a target.
-- **Configuration**: `backend/app/shared/config/settings.py` uses `pydantic-settings` with `computed_field` URLs for Postgres and RabbitMQ.
+- **No shared event store**: `backend/app/shared/events/` does not exist in published Git; bounded contexts use local persistence without a unified domain-events table. This confirms the shared event store is an accepted MVP Target.
+- **No outbox, idempotency, or RabbitMQ**: `backend/app/shared/messaging/` does not exist in published Git; there are no transactional outbox, idempotency store, or AMQP publisher/consumer primitives. Choreography + outbox is an accepted MVP Target.
+- **No DI containers**: `backend/app/modules/*/api/container.py` does not exist in any published module. Modules use FastAPI routers without `dependency-injector` wiring. DI containers are an accepted MVP Target.
+- **Payment stub**: `backend/app/modules/payments/application/authorize_payment.py` exists in published Git and uses `random.choice([True, True, True, False])`, confirming the deterministic simulated provider is a target.
+- **No IAM code**: CodeGraph has no `iam` module, auth middleware, or JWT references in `backend/app/`.
 
 ## Deviations from Design
 
-None — W4b implementation matches `design.md` and `spec.md`. The `Horizon + Status` dual-column schema explicitly resolves the prior spec/design ambiguity by separating the planning bucket (`Now` / `MVP Target` / `Future`) from the implementation state (`implemented` / `partial` / `target`).
+None — W5 implementation matches `design.md` and `spec.md`. The ADR statuses explicitly distinguish `Accepted (current implementation)`, `Partially implemented`, and `Accepted (MVP Target)` so target decisions are never presented as implemented. ADRs 0001 and 0003 were corrected from `Accepted (current implementation)` and `Partially implemented` to `Accepted (MVP Target)` after review identified they referenced code absent from published Git.
 
 ## Issues Found
 
-- `markdownlint-cli` and `mmdc` are not installed in this environment. W4b validation uses equivalent static checks (pytest assertions on section presence, matrix schema, status enums, evidence-path existence, Mermaid block syntax, and horizon honesty) consistent with W1–W4a.
-- The durable baseline comparison reports 5 pre-existing directory-existence mismatches (`backend/alembic/`, `backend/app/api/`, `backend/app/shared/events/`, `backend/app/shared/messaging/`, `backend/app/tests/`). These are from the pending `feat/phase1-config-di-refactor` refactor and were not introduced by W4b. File contents inside those directories are byte-identical to the baseline.
+- `markdownlint-cli` and `mmdc` are not installed in this environment. W5 validation uses equivalent static pytest checks (file existence, required headings, status honesty, link syntax, and index consistency) consistent with W1–W4b.
+- The only LSP diagnostics are pre-existing broken imports in `backend/app/shared/events/__init__.py` and test files; W5 did not touch backend code.
 
 ## Remaining Tasks
 
-- [ ] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`).
-- [ ] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames.
 - [ ] 6.1 Create `DESIGN.md`: YAML tokens, Target notice, Overview, Flows (Now/Target), Screen inventory, Colors, Typography, Layout, States, a11y, Components, Do/Don't; one `flowchart TD` checkout/error flow.
 - [ ] 6.2 Validate: Target header; only Now column present-tense; no duplicative diagrams; `mmdc` renders.
-- [ ] 7.1 Cross-link validation.
-- [ ] 7.2 Contract validation.
-- [ ] 7.3 Horizon + matrix validation.
-- [ ] 7.4 Quality + budget validation.
-- [ ] 7.5 Baseline closure.
+- [ ] 7.1 Cross-link: `lychee --offline <all>` resolves.
+- [ ] 7.2 Contract: event vocab == ordered `Literal[...]`; state == `pending→{pending,confirmed,cancelled}` idempotent; contexts/stack match spec.
+- [ ] 7.3 Horizon + matrix: no present-tense on `partial`/`target`; matrix rows carry Horizon + Status + Code-evidence.
+- [ ] 7.4 Quality + budget: `markdownlint` clean; `mmdc` all; per PR `git diff --stat` ≤400 (excl. generated diagrams).
+- [ ] 7.5 Baseline closure: status set == `paths.status`; per-path sha256 == `paths.sha256`; no add/remove/rename/status-change.
 
 ## Workload / PR Boundary
 
 - **Mode**: feature-branch-chain
-- **Current work unit**: W4b ARCHITECTURE matrix + diagrams
-- **Branch**: `docs/w4b-architecture` based on `docs/w4a-architecture`; PR will target `docs/w4a-architecture`
-- **Boundary**: Starts after W4a ARCHITECTURE narrative validation; ends with `ARCHITECTURE.md` W4b expansion and W4b validation
-- **Estimated review budget impact**: W4b `ARCHITECTURE.md` delta is 111 lines, well within the 400-line gate
+- **Current work unit**: W5 ADR seed + index
+- **Branch**: `docs/w5-adrs` based on `docs/w4b-architecture-v2` @ f829346
+- **Child PR target**: `docs/w4b-architecture-v2` (immediate parent; never `main` directly)
+- **Boundary**: Starts after W4b ARCHITECTURE matrix validation; ends with the 6 ADR files and W5 validation
+- **Estimated review budget impact**: W5 delta is well under the 350-line W5 max and the 400-line review gate
 
 ## Next Recommended
 
-`sdd-verify` for W4b, then proceed to W5 ADR seed + index.
+`sdd-verify` for W5, then proceed to W6 `DESIGN.md`.

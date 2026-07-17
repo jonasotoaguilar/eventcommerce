@@ -68,8 +68,8 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 6: ADR seed + index (W5, PR 6, ≤350)
 
-- [ ] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`): Title, Status, Context, Decision, Consequences, Options, References.
-- [ ] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames.
+- [x] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`): Title, Status, Context, Decision, Consequences, Options, References.
+- [x] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames.
 
 ## Phase 7: DESIGN (W6, PR 7, ≤400)
 
