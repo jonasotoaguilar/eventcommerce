@@ -243,7 +243,7 @@ sequenceDiagram
 
 ### Order state machine
 
-The transition set below matches `can_transition` in `backend/app/modules/orders/domain/services.py` exactly, including idempotent self-transitions. See [docs/GLOSSARY.md](./docs/GLOSSARY.md) for state vocabulary.
+The transition set below matches `can_transition` in `backend/app/modules/orders/domain/services/order_domain_service.py` exactly, including idempotent self-transitions. See [docs/GLOSSARY.md](./docs/GLOSSARY.md) for state vocabulary.
 
 ```mermaid
 stateDiagram-v2
