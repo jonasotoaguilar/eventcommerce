@@ -24,6 +24,7 @@ for _path in _model_paths:
         pass
 
 settings = get_settings()
+settings = get_settings()
 _test_url = getattr(settings, "test_database_url", None)
 if _test_url is None:
     _parsed = urlparse(str(settings.database_url))
