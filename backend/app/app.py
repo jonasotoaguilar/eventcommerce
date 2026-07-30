@@ -19,6 +19,12 @@ def create_app() -> FastAPI:
     notifications_container.wire(modules=["app.modules.notifications.api.routes"])
     payments_container.wire(modules=["app.modules.payments.api.routes"])
 
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        debug=settings.debug,
+    )
+
     @app.get("/health", tags=["health"])
     def healthcheck() -> dict[str, str]:
         return {"status": "ok", "service": settings.app_name}
