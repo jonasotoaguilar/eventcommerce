@@ -43,9 +43,7 @@ def get_database_url() -> str:
     a regular ``create_engine`` as long as we do not use the async APIs.
     """
     settings = get_settings()
-    url = settings.database_url
-    # Ensure we use a sync-friendly driver prefix for the migration engine.
-    # psycopg v3 supports sync mode; replace async-specific prefixes if present.
+    url: str = str(settings.database_url)
     if url.startswith("postgresql+asyncpg"):
         url = url.replace("postgresql+asyncpg", "postgresql+psycopg", 1)
     return url
