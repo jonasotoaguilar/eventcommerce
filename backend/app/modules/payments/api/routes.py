@@ -1,4 +1,4 @@
-"""Payments v1 routes."""
+"""Payments API routes."""
 
 from fastapi import APIRouter
 
