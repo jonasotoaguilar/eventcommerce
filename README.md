@@ -6,11 +6,11 @@ A product-quality portfolio project: a modular, event-driven commerce backend th
 
 ### Now
 
-- Python backend scaffold with `orders`, `inventory`, `payments`, and `notifications` bounded contexts.
-- Shared event envelope, idempotency primitives, and transactional outbox models in `backend/app/shared/messaging/`.
-- Order state model supports `pending`, `confirmed`, and `cancelled`.
-- FastAPI application structure, SQLAlchemy 2 async mappings, and initial API routes exist.
-- **Not yet live**: AMQP consumer, outbox worker/scheduler, IAM, catalog, cart, and frontend.
+- Python backend scaffold in `backend/app/` with `orders`, `inventory`, `payments`, and `notifications` bounded contexts; each module currently exposes only a `GET /_health` route.
+- Order aggregate in the `orders` context supports `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, and `cancelled`.
+- No shared event envelope, transactional outbox, idempotency store, RabbitMQ publisher, or `dependency-injector` containers exist in the published tree.
+- FastAPI application structure, SQLAlchemy 2 async mappings, and module scaffolds exist.
+- **Not yet live**: AMQP consumer, outbox worker/scheduler, IAM, catalog, cart, checkout, shared messaging, and frontend.
 
 ### MVP Target
 

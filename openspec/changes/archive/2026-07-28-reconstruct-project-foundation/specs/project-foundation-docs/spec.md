@@ -30,26 +30,37 @@ Every capability claim MUST be tagged Now, MVP Target, or Future. `ARCHITECTURE.
 
 - GIVEN the AMQP consumer and outbox worker are not yet bootstrapped, and catalog does not exist; WHEN a reviewer reads the matrix and greps `PRD.md` + `ARCHITECTURE.md` for catalog and AMQP; THEN those rows carry Status `partial`/`target` with code-evidence pointers AND no sentence uses present-tense business language implying they are live
 
-### Requirement: Code-Contract Lock-In
+### Requirement: Code-Contract Lock-In — Source Hierarchy
 
-Docs MUST honor current code contracts verbatim.
+Docs MUST honor the source hierarchy. Published Git Now is the binding reference for current-state claims. MVP Target contracts are sourced from the dirty refactor branch.
+
+#### Now (Published Git)
+
+| Contract | Value | Evidence |
+|---|---|---|
+| Current Events | `OrderCreated` (orders), `InventoryReserved` (inventory), `PaymentAuthorized` (payments), `OrderNotificationSent` (notifications) | `backend/app/modules/*/domain/events/*.py` per-module dataclasses |
+| State Machine | `pending→{inventory_reserved,cancelled}`, `inventory_reserved→{payment_authorized,cancelled}`, `payment_authorized→{confirmed,cancelled}` | `backend/app/modules/orders/domain/services/order_domain_service.py` `can_transition()` |
+| No shared infra | No envelope, outbox, idempotency, DI containers, RabbitMQ, or `aio-pika` | `backend/app/shared/` has only `config/` and `db/` |
+| Current Contexts | `orders`, `inventory`, `payments`, `notifications` | `backend/app/modules/` |
+| Stack | Py3.13+, FastAPI, SQLAlchemy 2 async, Pydantic Settings 2.x, Alembic, `uv` | Published code |
+
+#### MVP Target (source: dirty refactor branch)
 
 | Contract | Value |
 |---|---|
-| Events | `OrderCreated`, `InventoryReserved`, `InventoryRejected`, `OrderConfirmed`, `OrderCancelled` (`Literal[...]` in `app/shared/messaging/envelope.py`) |
-| State | `pending\|confirmed\|cancelled`; `pending→{pending,confirmed,cancelled}`; idempotent self on `confirmed`,`cancelled` |
-| Contexts | current: `orders`,`inventory`,`payments`,`notifications`; target: `iam`,`catalog`,`cart` |
-| Stack | Py3.13+, FastAPI 0.136, SQLAlchemy 2.0 async + psycopg3, Pydantic Settings 2.x, `dependency-injector` 2.x, `aio-pika` 9.x, Alembic 1.x, `uv` |
+| Target Events | `InventoryRejected`, `OrderConfirmed`, `OrderCancelled` (shared envelope) |
+| Target Contexts | `iam`, `catalog`, `cart` |
+| Target Stack | `dependency-injector`, `aio-pika`, shared event store, outbox, idempotency store |
 
-A current-capability claim MUST be backed by an existing `backend/app/` file referenced in the status matrix; otherwise the claim is tagged Target.
+A current-capability claim MUST be backed by an existing `backend/app/` file in the published tree; otherwise the claim is tagged MVP Target.
 
-#### Scenario: Event vocabulary matches the envelope literal
+#### Scenario: Current event vocabulary matches published per-module classes
 
-- GIVEN the docs list the event types they govern; WHEN a reviewer diffs the doc list against the `Literal[...]` in `app/shared/messaging/envelope.py`; THEN the sets are equal AND ordered identically
+- GIVEN the docs list current event types; WHEN a reviewer checks each against the per-module `domain/events/*.py` dataclass names in the published tree; THEN the sets match exactly
 
 #### Scenario: No invented current capability
 
-- GIVEN a doc claims a current capability; WHEN a reviewer locates the implementing code; THEN the file exists in `backend/app/` and is referenced in the status matrix, OR the claim is tagged Target
+- GIVEN a doc claims a current capability; WHEN a reviewer locates the implementing code; THEN the file exists in `backend/app/` in the published tree and is referenced in the status matrix, OR the claim is tagged Target
 
 ### Requirement: Product Contract
 
@@ -61,7 +72,7 @@ A current-capability claim MUST be backed by an existing `backend/app/` file ref
 
 ### Requirement: Required Sections per Document
 
-Each root doc MUST contain its required sections. Section matrix (each doc owns only its row): `README`=pitch,quick-path,layout,index,contribution-pointer; `PRD`=vision,problem,personas,journeys,MVP,rules,non-goals,metrics,glossary-pointer; `ARCHITECTURE`=topology,contexts,patterns,cross-cutting,NFRs,status-matrix,ADR-index; `DESIGN`=target-header,flows(Now/Target),screen-inventory,tokens,states,a11y; `GLOSSARY`=domain terms+event entries; `ADR`=title,status,context,decision,consequences (1/file). `docs/GLOSSARY.md` MUST list each of the 5 event types with producer and consumer. `docs/adr/` MUST seed ≥1 ADR per: shared event store, choreography over saga, `dependency-injector`, IAM bounded context, deterministic simulated payments.
+Each root doc MUST contain its required sections. Section matrix (each doc owns only its row): `README`=pitch,quick-path,layout,index,contribution-pointer; `PRD`=vision,problem,personas,journeys,MVP,rules,non-goals,metrics,glossary-pointer; `ARCHITECTURE`=topology,contexts,patterns,cross-cutting,NFRs,status-matrix,ADR-index; `DESIGN`=target-header,flows(Now/Target),screen-inventory,tokens,states,a11y; `GLOSSARY`=domain terms+event entries; `ADR`=title,status,context,decision,consequences (1/file). `docs/GLOSSARY.md` MUST list each of the 7 governed event types (4 Now + 3 MVP Target) with producer and consumer. `docs/adr/` MUST seed ≥1 ADR per: shared event store, choreography over saga, `dependency-injector`, IAM bounded context, deterministic simulated payments.
 
 #### Scenario: Overlapping claims are linked, not duplicated
 
@@ -69,7 +80,7 @@ Each root doc MUST contain its required sections. Section matrix (each doc owns 
 
 #### Scenario: GLOSSARY and ADR seed cover the contract
 
-- GIVEN `docs/GLOSSARY.md` and `docs/adr/` are read; WHEN a reviewer checks the 5 event types and 5 named decisions; THEN each event has a row (producer + consumer) AND each decision has a seeded ADR
+- GIVEN `docs/GLOSSARY.md` and `docs/adr/` are read; WHEN a reviewer checks the 7 governed event types (4 Now + 3 MVP Target) and 5 named decisions; THEN each event has a row (producer + consumer) AND each decision has a seeded ADR
 
 ### Requirement: Cross-Links and Maintainability
 
