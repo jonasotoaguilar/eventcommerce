@@ -1,7 +1,7 @@
 """Pure domain logic for inventory."""
 
-from app.modules.inventory.domain.entities.inventory import Inventory
-from app.modules.inventory.domain.errors.domain_errors import InsufficientStockError
+from app.modules.inventory.domain.entities import Inventory
+from app.modules.inventory.domain.errors import InsufficientStockError
 
 
 def reserve_stock(inventory: Inventory, quantity: int) -> None:

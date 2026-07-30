@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from app.modules.inventory.domain.entities.inventory import Inventory
+from app.modules.inventory.domain.entities import Inventory
 
 
 class InventoryRepository(Protocol):

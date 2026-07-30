@@ -1,4 +1,4 @@
-"""Inventory domain entity."""
+"""Inventory domain entities."""
 
 from dataclasses import dataclass
 
@@ -8,3 +8,8 @@ class Inventory:
     product_id: str
     available_quantity: int
     reserved_quantity: int
+
+
+@dataclass(frozen=True)
+class StockQuantity:
+    amount: int
