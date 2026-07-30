@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.modules.inventory.api.routes import router as inventory_router
 from app.modules.notifications.api.routes import router as notifications_router
 from app.modules.orders.api.routes import router as orders_router
-from app.modules.payments.api.routes.v1.router import router as payments_router
+from app.modules.payments.api.routes import router as payments_router
 from app.shared.config import get_settings
 
 
