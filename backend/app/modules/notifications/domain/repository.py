@@ -3,7 +3,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from app.modules.notifications.domain.entities.notification import Notification
+from app.modules.notifications.domain.entities import Notification
 
 
 class NotificationRepository(Protocol):

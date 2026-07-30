@@ -1,4 +1,4 @@
-"""Notification domain entity."""
+"""Notification domain entities."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,3 +12,8 @@ class Notification:
     channel: str
     content: str
     sent_at: datetime
+
+
+@dataclass(frozen=True)
+class NotificationChannel:
+    name: str
