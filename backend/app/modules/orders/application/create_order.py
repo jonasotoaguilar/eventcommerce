@@ -3,8 +3,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from app.modules.orders.domain.entities.order import Order
-from app.modules.orders.domain.value_objects.order_item import OrderItem
+from app.modules.orders.domain.entities import Order, OrderItem
 
 
 class CreateOrder:
