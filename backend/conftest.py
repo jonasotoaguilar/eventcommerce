@@ -24,7 +24,7 @@ for _path in _model_paths:
         pass
 
 settings = get_settings()
-_parsed = urlparse(settings.database_url)
+_parsed = urlparse(str(settings.database_url))
 _db = f"{_parsed.path[1:]}_test"
 TEST_DATABASE_URL = urlunparse(_parsed._replace(path=f"/{_db}"))
 
