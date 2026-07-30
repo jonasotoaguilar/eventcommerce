@@ -1,6 +1,6 @@
-from app.shared.config import get_settings
-
 import uvicorn
+
+from app.shared.config import get_settings
 
 
 def main() -> None:
