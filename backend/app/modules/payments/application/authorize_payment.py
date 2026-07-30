@@ -5,12 +5,10 @@ from collections.abc import Callable
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
-from app.modules.payments.domain.entities.payment import Payment
-from app.modules.payments.domain.errors.domain_errors import PaymentRejectedError
-from app.modules.payments.domain.repositories.repository import PaymentRepository
-from app.modules.payments.domain.services.payment_domain_service import (
-    ensure_payment_amount_is_valid,
-)
+from app.modules.payments.domain.entities import Payment
+from app.modules.payments.domain.errors import PaymentRejectedError
+from app.modules.payments.domain.repository import PaymentRepository
+from app.modules.payments.domain.services import ensure_payment_amount_is_valid
 
 
 class AuthorizePayment:
