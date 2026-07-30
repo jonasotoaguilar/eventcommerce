@@ -7,7 +7,7 @@ The project root has a 1-line `README.md` and no `PRD.md`, `ARCHITECTURE.md`, or
 ## Why Foundation Before Setup & Implementation
 
 - Code without a governing PRD/ARCH drifts; the refactor on `feat/phase1-config-di-refactor` is already uncommitted and undocumented.
-- The event vocabulary (`OrderCreated`, `InventoryReserved`, `InventoryRejected`, `OrderConfirmed`, `OrderCancelled`), order state machine (`pending|confirmed|cancelled`), and bounded-context names are pinned in code. Locking them in docs now prevents every later change from inventing a divergent vocabulary.
+- **Source hierarchy (Published Git Now wins)**: per-module event dataclasses `OrderCreated`, `InventoryReserved`, `PaymentAuthorized`, `OrderNotificationSent` and order state machine `pending → inventory_reserved → payment_authorized → confirmed|cancelled` from `order_domain_service.py`. No shared envelope, outbox, idempotency, or DI containers exist. The dirty refactor (shared envelope `InventoryRejected`, `OrderConfirmed`, `OrderCancelled`; outbox; choreography) is **MVP Target** evidence only. Historical `exploration.md` captures the dirty-working-tree snapshot as context, never as Now evidence.
 - Setup / CI / frontend follow-up slices must reference a stable product definition; authoring tooling first risks building for the wrong product.
 
 ## Scope
@@ -38,7 +38,8 @@ The project root has a 1-line `README.md` and no `PRD.md`, `ARCHITECTURE.md`, or
 
 Single change, per-doc deliverables authored in order **README → PRD → ARCHITECTURE → DESIGN** so later cross-references are stable (exploration Approach 3).
 
-- **Contracts lock-in**: docs MUST honor the in-code event vocabulary and order state machine above; entities/fields and stack choices (Python 3.13, FastAPI, SQLAlchemy 2 async, `pydantic-settings`, `dependency-injector`, `aio-pika`, Alembic, `uv`) recorded as verified, not invented.
+- **Contracts lock-in by source hierarchy**: Published Git Now (per-module events `OrderCreated`, `InventoryReserved`, `PaymentAuthorized`, `OrderNotificationSent`; `can_transition` from `order_domain_service.py`) is the binding current-state reference. The dirty refactor vocabulary (shared envelope events `InventoryRejected`, `OrderConfirmed`, `OrderCancelled`; outbox; DI containers; `aio-pika`) is MVP Target evidence only. Stack choices (Python 3.13, FastAPI, SQLAlchemy 2 async, `pydantic-settings`, Alembic, `uv`) are recorded from published code where present.
+- **Exploration note**: `exploration.md` was authored against the dirty `feat/phase1-config-di-refactor` working tree. Its findings reflect the refactor Target, not published Git Now. Do not cite exploration findings as current-state evidence.
 - **MVP framing (user-approved, locked)**: portfolio project with product-quality realism (not a toy demo, not initially a commercial operation). MVP = full commerce journey — IAM, catalog, cart, checkout, orders, inventory, simulated payments, notifications. Event coordination = choreography + transactional outbox + idempotent consumers. IAM = owned bounded context with JWT (registration / login / role authorization). Payments = real bounded context behind ports/adapters with a **deterministic** simulated provider for the MVP (no random outcomes as business behavior).
 - **Honesty rule**: every doc distinguishes Now / MVP Target / Future. ARCHITECTURE carries a Current Implementation Status matrix per decision (`implemented` / `partial` / `target`) so partials (AMQP consumer, outbox worker) are never cited as live.
 - `DESIGN.md` is explicitly a **target design** doc (frontend does not exist); only its Now column is binding.
