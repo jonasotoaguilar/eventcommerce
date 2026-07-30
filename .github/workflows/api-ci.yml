@@ -58,8 +58,8 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
         with:
-          cache: true
-          cache-dependency-path: backend/pyproject.toml
+          enable-cache: true
+          cache-dependency-glob: "backend/pyproject.toml"
 
       - name: Create test database
         run: |
