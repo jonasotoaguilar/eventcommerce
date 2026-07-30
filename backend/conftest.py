@@ -32,7 +32,7 @@ if _test_url is None:
 TEST_DATABASE_URL = _test_url
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def engine():
     engine = create_async_engine(TEST_DATABASE_URL, future=True)
     async with engine.begin() as conn:
