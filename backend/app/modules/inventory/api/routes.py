@@ -1,4 +1,4 @@
-"""Inventory v1 routes."""
+"""Inventory API routes."""
 
 from fastapi import APIRouter
 
