@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from app.modules.payments.domain.repositories.repository import PaymentRepository
+from app.modules.payments.domain.repository import PaymentRepository
 
 
 class ProcessPaymentFailure:
