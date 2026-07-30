@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 
-from app.modules.inventory.api.routes.v1.router import router as inventory_router
-from app.modules.notifications.api.routes.v1.router import (
-    router as notifications_router,
-)
-from app.modules.orders.api.routes.v1.router import router as orders_router
-from app.modules.payments.api.routes.v1.router import router as payments_router
+from app.modules.inventory.api.routes import router as inventory_router
+from app.modules.notifications.api.routes import router as notifications_router
+from app.modules.orders.api.routes import router as orders_router
+from app.modules.payments.api.routes import router as payments_router
 from app.shared.config import get_settings
 
 
@@ -17,6 +15,10 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         debug=settings.debug,
     )
+
+    from app.modules.orders.api.container import orders_container
+
+    orders_container.wire(modules=["app.modules.orders.api.routes"])
 
     @app.get("/health", tags=["health"])
     def healthcheck() -> dict[str, str]:
