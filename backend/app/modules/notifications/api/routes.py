@@ -1,4 +1,4 @@
-"""Notifications v1 routes."""
+"""Notifications API routes."""
 
 from fastapi import APIRouter
 
