@@ -16,10 +16,6 @@ from app.shared.messaging.outbox_repository import SqlAlchemyOutboxRepository
 class OrdersContainer(containers.DeclarativeContainer):
     """Orders module container wiring repositories and use cases."""
 
-    wiring_config = containers.WiringConfiguration(
-        modules=["app.modules.orders.api.routes"]
-    )
-
     session = providers.Dependency(instance_of=AsyncSession)
 
     order_repo = providers.Factory(SqlAlchemyOrderRepository, session=session)
