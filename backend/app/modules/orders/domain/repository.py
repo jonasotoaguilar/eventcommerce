@@ -1,9 +1,9 @@
-"""Order repository protocol."""
+"""Order repository protocols."""
 
 from typing import Protocol
 from uuid import UUID
 
-from app.modules.orders.domain.entities.order import Order
+from app.modules.orders.domain.entities import Order
 
 
 class OrderRepository(Protocol):
