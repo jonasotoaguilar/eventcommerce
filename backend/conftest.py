@@ -29,7 +29,7 @@ _db = f"{_parsed.path[1:]}_test"
 TEST_DATABASE_URL = urlunparse(_parsed._replace(path=f"/{_db}"))
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def engine():
     engine = create_async_engine(TEST_DATABASE_URL, future=True)
     async with engine.begin() as conn:
