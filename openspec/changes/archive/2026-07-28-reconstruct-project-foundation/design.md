@@ -8,7 +8,7 @@ Produce an evidence-led documentation system. Root-doc authorship is sequenced `
 
 | Option | Trade-off | Decision |
 |---|---|---|
-| Verified working-tree code vs prior docs/memory | Code can be incomplete but proves **Now** | Current code wins for present-state claims; approved spec governs acceptance; accepted product decisions govern MVP intent; proposal/exploration provide context; Future is non-binding. Conflicts are classified by horizon, never blended. |
+| Published Git (Now) vs dirty working tree (Target) | Dirty refactor has shared infra that does not exist in published Git | Published Git Now is binding for current-state claims; dirty refactor is MVP Target evidence only; `exploration.md` is historical snapshot against dirty tree, not Now evidence. Conflicts are classified by source hierarchy, never blended. |
 | Duplicate context in every doc vs ownership | Links add navigation but prevent drift | One owner per fact; other documents use relative links to canonical headings. |
 | Prose-only status vs explicit schema | Tables require maintenance but expose overclaims | Every capability is horizon-tagged; ARCHITECTURE carries the implementation matrix. |
 | Broad diagram set vs question-driven diagrams | Fewer diagrams omit decoration, not information | Include only topology, event flow, state machine, and UX flow views listed below. |
@@ -29,11 +29,11 @@ ADR filenames are `0001-use-shared-event-store.md`, `0002-use-choreography.md`, 
 
 ## Interfaces / Contracts
 
-The ARCHITECTURE matrix schema is `Decision | Horizon | Status | Code evidence | Doc location`, where status is exactly `implemented`, `partial`, or `target`. **Now** requires an existing `backend/app/` pointer; unwired AMQP/outbox execution is `partial`; IAM/catalog/cart and deterministic payment replacement are `target`. **Future** remains explicitly non-committed.
+The ARCHITECTURE matrix schema is `Decision | Horizon | Status | Code evidence | Doc location`, where status is exactly `implemented`, `partial`, or `target`. **Now** requires an existing `backend/app/` pointer in the published Git tree only; shared infrastructure (envelope, outbox, idempotency, DI containers, RabbitMQ) absent from published tree is `target` with Horizon `MVP Target`. IAM/catalog/cart and deterministic payment replacement are `target`. **Future** remains explicitly non-committed.
 
 Link map: README → PRD/ARCHITECTURE/DESIGN; every root doc → GLOSSARY when using governed terms; ARCHITECTURE → ADR index/DESIGN; index ↔ ADRs.
 
-Contract checks compare the ordered envelope events, order transitions, contexts, and stack against the spec/code. Product text preserves portfolio-quality full-commerce MVP, choreography + outbox + idempotency, owned JWT IAM, and deterministic simulated payments.
+Contract checks compare ordered current events (per-module dataclasses), order transitions (`can_transition`), current contexts, and stack against the published Git tree for Now, and against the spec for MVP Target. Product text preserves portfolio-quality full-commerce MVP, choreography + outbox + idempotency, owned JWT IAM, and deterministic simulated payments.
 
 ## Diagrams
 

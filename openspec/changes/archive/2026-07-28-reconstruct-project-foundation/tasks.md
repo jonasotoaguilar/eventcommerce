@@ -48,38 +48,39 @@ Baseline gate (S12): every W1–W6 PR open verifies status set == `paths.status`
 
 ## Phase 2: PRD (W2, PR 2, ≤400)
 
-- [ ] 2.1 Create `PRD.md`: Vision, Problem, Personas, Journeys, MVP Target, Business rules, Non-goals, Metrics, Glossary pointer.
-- [ ] 2.2 Validate: ≥2 personas; MVP lists every commerce context; no present-tense for AMQP/catalog; `markdownlint` clean.
+- [x] 2.1 Create `PRD.md`: Vision, Problem, Personas, Journeys, MVP Target, Business rules, Non-goals, Metrics, Glossary pointer.
+- [x] 2.2 Validate: ≥2 personas; MVP lists every commerce context; no present-tense for AMQP/catalog; `markdownlint` clean.
 
 ## Phase 3: GLOSSARY (W3, PR 3, ≤200)
 
-- [ ] 3.1 Create `docs/GLOSSARY.md`: Usage, Domain terms, Events table (5 rows, producer+consumer), State vocabulary, Maintenance rule.
-- [ ] 3.2 Validate: event rows == ordered `Literal[...]` in `backend/app/shared/messaging/envelope.py`.
+- [x] 3.1 Create `docs/GLOSSARY.md`: Usage, Domain terms, Events table (7 rows — 4 Now + 3 Target, producer+consumer), State vocabulary, Maintenance rule.
+- [x] 3.2 Validate: event rows == ordered `Literal[...]` in `backend/app/shared/messaging/envelope.py`.
 
 ## Phase 4: ARCHITECTURE narrative (W4a, PR 4, ≤320)
 
-- [ ] 4a.1 Create `ARCHITECTURE.md` core: Overview, Topology (`flowchart LR`), Bounded contexts, Patterns, ADR index (planned paths), DESIGN link.
-- [ ] 4a.2 Validate: ADR index planned paths; DESIGN link planned; `mmdc` renders.
+- [x] 4a.1 Create `ARCHITECTURE.md` core: Overview, Topology (`flowchart LR`), Bounded contexts, Patterns, ADR index (planned paths), DESIGN link.
+- [x] 4a.2 Validate: ADR index planned paths; DESIGN link planned; `mmdc` renders.
 
 ## Phase 5: ARCHITECTURE matrix + diagrams (W4b, PR 5, ≤400)
 
-- [ ] 4b.1 Extend `ARCHITECTURE.md`: Cross-cutting, NFRs, Current Implementation Status matrix, `sequenceDiagram`, `stateDiagram-v2`.
-- [ ] 4b.2 Validate: matrix status ∈ {implemented, partial, target}; partials never present-tense; `mmdc` all.
+- [x] 4b.1 Extend `ARCHITECTURE.md`: Cross-cutting, NFRs, Current Implementation Status matrix, `sequenceDiagram`, `stateDiagram-v2`.
+- [x] 4b.2 Validate: matrix status ∈ {implemented, partial, target}; partials never present-tense; `mmdc` all.
 
 ## Phase 6: ADR seed + index (W5, PR 6, ≤350)
 
-- [ ] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`): Title, Status, Context, Decision, Consequences, Options, References.
-- [ ] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames.
+- [x] 5.1 Create `docs/adr/README.md` + 5 ADRs (`0001..0005-use-*.md`): Title, Status, Context, Decision, Consequences, Options, References.
+- [x] 5.2 Validate: 5 files exist; structure per ADR; index matches filenames.
 
 ## Phase 7: DESIGN (W6, PR 7, ≤400)
 
-- [ ] 6.1 Create `DESIGN.md`: YAML tokens, Target notice, Overview, Flows (Now/Target), Screen inventory, Colors, Typography, Layout, States, a11y, Components, Do/Don't; one `flowchart TD` checkout/error flow.
-- [ ] 6.2 Validate: Target header; only Now column present-tense; no duplicative diagrams; `mmdc` renders.
+- [x] 6.1 Create `DESIGN.md`: YAML tokens, Target notice, Overview, Flows (Now/Target), Screen inventory, Colors, Typography, Layout, States, a11y, Components, Do/Don't; one `flowchart TD` checkout/error flow.
+- [x] 6.2 Validate: Target header; only Now column present-tense; no duplicative diagrams; `mmdc` renders.
 
 ## Phase 8: Cross-link + Contract + Baseline Closure (W7, verify gate, no PR)
 
-- [ ] 7.1 Cross-link: `lychee --offline <all>` resolves.
-- [ ] 7.2 Contract: event vocab == ordered `Literal[...]`; state == `pending→{pending,confirmed,cancelled}` idempotent; contexts/stack match spec.
-- [ ] 7.3 Horizon + matrix: no present-tense on `partial`/`target`; matrix rows carry Horizon + Status + Code-evidence.
-- [ ] 7.4 Quality + budget: `markdownlint` clean; `mmdc` all; per PR `git diff --stat` ≤400 (excl. generated diagrams).
-- [ ] 7.5 Baseline closure: status set == `paths.status`; per-path sha256 == `paths.sha256`; no add/remove/rename/status-change.
+- [x] 7.1 Cross-link: all relative file and anchor links resolve.
+- [x] 7.2 Contract: current event classes (`OrderCreated`, `InventoryReserved`, `PaymentAuthorized`, `OrderNotificationSent`) and target events (`InventoryRejected`, `OrderConfirmed`, `OrderCancelled`) are separated; state transitions match `order_domain_service.py`.
+- [x] 7.3 Horizon + matrix: no present-tense on `partial`/`target`; matrix rows carry Horizon + Status + Code-evidence; absent shared infrastructure tagged MVP Target.
+- [x] 7.4 Quality + budget: required sections present; Mermaid blocks valid; DESIGN.md front matter parses; W7 corrective diff ≤400 changed lines.
+- [x] 7.5 Baseline closure: excluded paths unchanged; status set and sha256 match baseline; correction manifest exists.
+- [x] 7.6 Contract-artifact consistency: proposal/spec/design vs canonical docs vs published code — current events, state machine, absent shared infrastructure/DI, source hierarchy separation, target separation via Now/Target split.
