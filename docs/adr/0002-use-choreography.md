@@ -21,7 +21,7 @@ Use event choreography for the MVP: contexts react to events published via the t
 
 ## Consequences
 
-- **Positive**: aligns with the current outbox and envelope; lets each context evolve independently.
+- **Positive**: aligns with the planned outbox and envelope; lets each context evolve independently.
 - **Negative**: distributed compensations (e.g., release inventory on payment failure) are harder to trace than a saga log.
 - **Neutral**: future evolution to an orchestrated saga or hybrid is not precluded.
 

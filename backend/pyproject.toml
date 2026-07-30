@@ -27,6 +27,7 @@ dev = [
     "pyrefly>=0.63.1",
     "ruff>=0.14.1",
     "pytest>=9.0.3",
+    "PyYAML>=6.0.1",
 ]
 
 [tool.uv.build-backend]
