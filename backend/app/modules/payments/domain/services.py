@@ -1,6 +1,6 @@
 """Pure domain logic for payments."""
 
-from app.modules.payments.domain.errors.domain_errors import PaymentRejectedError
+from app.modules.payments.domain.errors import PaymentRejectedError
 
 
 def ensure_payment_amount_is_valid(amount: float) -> None:

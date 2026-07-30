@@ -1,4 +1,4 @@
-"""Payment domain entity."""
+"""Payment domain entities."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,3 +13,9 @@ class Payment:
     amount: float
     currency: str
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class Money:
+    amount: float
+    currency: str

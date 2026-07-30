@@ -3,7 +3,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from app.modules.payments.domain.entities.payment import Payment
+from app.modules.payments.domain.entities import Payment
 
 
 class PaymentRepository(Protocol):
