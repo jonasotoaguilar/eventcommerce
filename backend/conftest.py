@@ -9,12 +9,12 @@ from app.shared.config import get_settings
 from app.shared.db.base import Base
 
 _model_paths = [
-    "app.shared.events.models",
-    "app.shared.messaging.models",
     "app.modules.orders.infrastructure.models",
     "app.modules.inventory.infrastructure.models",
     "app.modules.payments.infrastructure.models",
     "app.modules.notifications.infrastructure.models",
+    "app.shared.events.models",
+    "app.shared.messaging.models",
 ]
 
 for _path in _model_paths:
@@ -24,14 +24,18 @@ for _path in _model_paths:
         pass
 
 settings = get_settings()
-_parsed = urlparse(settings.database_url)
-_db = f"{_parsed.path[1:]}_test"
-TEST_DATABASE_URL = urlunparse(_parsed._replace(path=f"/{_db}"))
+settings = get_settings()
+_test_url = getattr(settings, "test_database_url", None)
+if _test_url is None:
+    _parsed = urlparse(str(settings.database_url))
+    _db = f"{_parsed.path[1:]}_test"
+    _test_url = urlunparse(_parsed._replace(path=f"/{_db}"))
+TEST_DATABASE_URL = _test_url
 
 
 @pytest_asyncio.fixture(scope="function")
 async def engine():
-    engine = create_async_engine(TEST_DATABASE_URL, future=True)
+    engine = create_async_engine(str(TEST_DATABASE_URL), future=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)

@@ -8,6 +8,9 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "aio-pika",
+    "alembic",
+    "dependency-injector",
     "fastapi>=0.136.1",
     "psycopg[binary]>=3.3.3",
     "pydantic-settings>=2.14.0",
@@ -29,6 +32,7 @@ dev = [
     "pytest>=9.0.3",
     "PyYAML>=6.0.1",
     "pytest-asyncio>=1.4.0",
+    "httpx>=0.28.1",
 ]
 
 [tool.uv.build-backend]
