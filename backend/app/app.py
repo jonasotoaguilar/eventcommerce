@@ -1,16 +1,23 @@
 from fastapi import FastAPI
 
-from app.modules.inventory.api.routes.v1.router import router as inventory_router
-from app.modules.notifications.api.routes.v1.router import (
-    router as notifications_router,
-)
-from app.modules.orders.api.routes.v1.router import router as orders_router
-from app.modules.payments.api.routes.v1.router import router as payments_router
+from app.modules.inventory.api.container import inventory_container
+from app.modules.inventory.api.routes import router as inventory_router
+from app.modules.notifications.api.container import notifications_container
+from app.modules.notifications.api.routes import router as notifications_router
+from app.modules.orders.api.container import orders_container
+from app.modules.orders.api.routes import router as orders_router
+from app.modules.payments.api.container import payments_container
+from app.modules.payments.api.routes import router as payments_router
 from app.shared.config import get_settings
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+
+    orders_container.wire(modules=["app.modules.orders.api.routes"])
+    inventory_container.wire(modules=["app.modules.inventory.api.routes"])
+    notifications_container.wire(modules=["app.modules.notifications.api.routes"])
+    payments_container.wire(modules=["app.modules.payments.api.routes"])
 
     app = FastAPI(
         title=settings.app_name,
