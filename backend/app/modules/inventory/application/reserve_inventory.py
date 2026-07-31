@@ -2,9 +2,9 @@
 
 from uuid import UUID
 
-from app.modules.inventory.domain.errors.domain_errors import InsufficientStockError
-from app.modules.inventory.domain.repositories.repository import InventoryRepository
-from app.modules.inventory.domain.services.inventory_domain_service import reserve_stock
+from app.modules.inventory.domain.errors import InsufficientStockError
+from app.modules.inventory.domain.repository import InventoryRepository
+from app.modules.inventory.domain.services import reserve_stock
 
 
 class ReserveInventory:

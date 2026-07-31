@@ -2,9 +2,9 @@
 
 from uuid import UUID
 
-from app.modules.orders.domain.entities.order import Order
-from app.modules.orders.domain.errors.domain_errors import OrderNotFoundError
-from app.modules.orders.domain.repositories.repository import OrderRepository
+from app.modules.orders.domain.entities import Order
+from app.modules.orders.domain.errors import OrderNotFoundError
+from app.modules.orders.domain.repository import OrderRepository
 
 
 class GetOrder:
