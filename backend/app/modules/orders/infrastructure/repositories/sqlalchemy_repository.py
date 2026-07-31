@@ -4,8 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.orders.domain.entities.order import Order
-from app.modules.orders.domain.repositories.repository import OrderRepository
+from app.modules.orders.domain.entities import Order
+from app.modules.orders.domain.repository import OrderRepository
 
 
 class SqlAlchemyOrderRepository(OrderRepository):

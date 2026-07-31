@@ -14,7 +14,7 @@ from app.shared.config import get_settings
 @lru_cache
 def get_engine() -> AsyncEngine:
     settings = get_settings()
-    return create_async_engine(settings.database_url, future=True)
+    return create_async_engine(str(settings.database_url), future=True)
 
 
 @lru_cache
