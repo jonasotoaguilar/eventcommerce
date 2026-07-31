@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from app.modules.orders.domain.repositories.repository import OrderRepository
+from app.modules.orders.domain.repository import OrderRepository
 
 
 class CancelOrder:

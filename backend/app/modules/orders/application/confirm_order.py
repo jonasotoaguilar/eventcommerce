@@ -2,12 +2,12 @@
 
 from uuid import UUID
 
-from app.modules.orders.domain.errors.domain_errors import (
+from app.modules.orders.domain.errors import (
     InvalidStateTransitionError,
     OrderNotFoundError,
 )
-from app.modules.orders.domain.repositories.repository import OrderRepository
-from app.modules.orders.domain.services.order_domain_service import can_transition
+from app.modules.orders.domain.repository import OrderRepository
+from app.modules.orders.domain.services import can_transition
 
 
 class ConfirmOrder:

@@ -1,6 +1,6 @@
 """ReleaseInventory use case."""
 
-from app.modules.inventory.domain.repositories.repository import InventoryRepository
+from app.modules.inventory.domain.repository import InventoryRepository
 
 
 class ReleaseInventory:
