@@ -77,9 +77,23 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine
-    and associate a connection with the context.
-
+    and associate a connection with the context. When the caller supplies a
+    pre-existing connection via ``config.attributes['connection']`` (used by
+    integration tests that need to point alembic at a disposable database),
+    that connection is reused directly and no new engine is created.
     """
+    provided_connection = (
+        config.attributes.get("connection") if hasattr(config, "attributes") else None
+    )
+
+    if provided_connection is not None:
+        context.configure(
+            connection=provided_connection, target_metadata=target_metadata
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     url = get_database_url()
     connectable = create_engine(url, poolclass=pool.NullPool)
 
