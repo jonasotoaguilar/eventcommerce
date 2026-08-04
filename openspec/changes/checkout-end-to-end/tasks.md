@@ -68,9 +68,9 @@ Chain ordering (feature-branch-chain): PR #1 (S1) targets the tracker branch `fe
 
 ## Phase 3: Slice 3 — Inventory Lock + Checkout + API + E2E
 
-- [ ] 3.1 RED: `SELECT FOR UPDATE` sorted by `product_id`, deadlock-free under concurrent multi-line reserves; insufficient stock raises with no partial reservation.
-- [ ] 3.2 RED: rollback after later persistence error undoes original reservation.
-- [ ] 3.3 GREEN: add `lock_and_check_availability` to `backend/app/modules/inventory/infrastructure/sqlalchemy_repository.py`; sort+lock+check before mutate; `ReleaseInventory` compensates.
+- [x] 3.1 RED: `SELECT FOR UPDATE` sorted by `product_id`, deadlock-free under concurrent multi-line reserves; insufficient stock raises with no partial reservation.
+- [x] 3.2 RED: rollback after later persistence error undoes original reservation.
+- [x] 3.3 GREEN: add `lock_and_check_availability` to `backend/app/modules/inventory/infrastructure/sqlalchemy_repository.py`; sort+lock+check before mutate; `ReleaseInventory` compensates.
 - [ ] 3.4 RED: `CheckoutRequest` validation — `422` for `quantity=0`, `items=[]`, invalid currency (syntactic ISO 4217, three uppercase ASCII letters; not a catalog check), `amount` with >2 decimals, missing fields; `201`-class pass-through for a fully-valid request.
 - [ ] 3.5 RED: happy path — `201`, `pending→confirmed`, `approved` Payment, inventory reserved, outbox rows, notification intent.
 - [ ] 3.6 RED: payment decline — release, cancel `payment_declined`, `PaymentFailed` persisted, no double-charge, cancellation notification.
