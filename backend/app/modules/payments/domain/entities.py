@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
 
@@ -10,9 +11,10 @@ class Payment:
     id: UUID
     order_id: UUID
     status: str
-    amount: float
+    amount: Decimal
     currency: str
     created_at: datetime
+    failure_reason: str | None = None
 
 
 @dataclass(frozen=True)
