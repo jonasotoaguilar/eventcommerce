@@ -2,13 +2,13 @@
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
-Chain strategy: pending
+Chain strategy: feature-branch-chain
 400-line budget risk: High
 800-line budget risk: High
 
 ## Review Workload Forecast
 
-Estimated changed lines: ~1,800–2,500 (additions+deletions, incl. tests). Delivery strategy: auto-chain. Suggested split: S1 Migration+idempotency → S2 Decimal payment+ADR → S3 Inventory lock+Checkout+API+E2E → Chore stub deletion. `chain_strategy: pending` so orchestrator collects stacked-to-main vs feature-branch-chain.
+Estimated changed lines: ~1,800–2,500 (additions+deletions, incl. tests). Delivery strategy: auto-chain. Suggested split: S1 Migration+idempotency → S2 Decimal payment+ADR → S3 Inventory lock+Checkout+API+E2E → Chore stub deletion. `chain_strategy: feature-branch-chain` (user-selected 2026-08-03: automatic chained PRs, 800-line review budget).
 
 ### Spec Scenario → Task Traceability (all 12, none omitted)
 
@@ -36,18 +36,18 @@ Estimated changed lines: ~1,800–2,500 (additions+deletions, incl. tests). Deli
 | S3 | Inventory lock + Checkout/DI/API + E2E | `cd backend && uv run python -m pytest app/tests/test_checkout_end_to_end.py -x` | Postgres test DB; `uv run uvicorn app.main:app` + `curl POST /api/v1/checkout` | Revert `app/modules/checkout/*`; revert `app.py` router; revert FOR UPDATE; keep S1+S2 |
 | Chore | Dead stub deletion (isolated) | `cd backend && uv run python -m pytest -x` | N/A (file-only) | Restore `repositories/sqlalchemy_repository.py`; no schema/imports affected |
 
-Chain ordering: S1 base=`main`; S2 base=`main` (or S1 in feature-branch-chain); S3 base=S2 (or `main` in stacked-to-main); Chore base=`main`. `chain_strategy: pending` — orchestrator collects user choice.
+Chain ordering (feature-branch-chain): PR #1 (S1) targets the tracker branch `feat/checkout-end-to-end`; S2 targets the S1 PR branch; S3 targets the S2 PR branch; Chore targets `main` after S3 integrates. `chain_strategy: feature-branch-chain` — user-selected automatic chained PRs (2026-08-03); 800-line review budget.
 
 ## Phase 1: Slice 1 — Migration + Idempotency (Foundation)
 
 - [x] 1.1 RED: migration test — `event_id` UUID→Text, `payload_hash CHAR(64)`, `response_status`, `response_body JSON`, `updated_at`, `state` (`processed|in_progress|completed`), backfill `state='processed'`; `payments.amount` Float→`NUMERIC(11,2)`.
-- [ ] 1.2 RED: payload-hash canonicalization (sorted-key compact JSON, item order preserved, deterministic).
-- [ ] 1.3 RED: `pg_advisory_xact_lock` race — identical concurrent payloads execute once; differing payload under in-use key → `409` without mutating first execution.
-- [ ] 1.4 RED: replay — cached `response_status`+`response_body` returned, no re-execution.
+- [x] 1.2 RED: payload-hash canonicalization (sorted-key compact JSON, item order preserved, deterministic).
+- [x] 1.3 RED: `pg_advisory_xact_lock` race — identical concurrent payloads execute once; differing payload under in-use key → `409` without mutating first execution.
+- [x] 1.4 RED: replay — cached `response_status`+`response_body` returned, no re-execution.
 - [x] 1.5 GREEN: `backend/alembic/versions/*_extend_checkout_idempotency.py` (deploy before route; downgrade documented).
 - [x] 1.6 GREEN: update `backend/app/shared/messaging/models.py` (`ProcessedEventModel`).
-- [ ] 1.7 GREEN: extend `backend/app/shared/messaging/idempotency.py` — `claim`/`complete_with_response`/`fetch_cached`/`release_claim`; advisory-lock helper; 16 KiB cap; rollback removes uncommitted claim.
-- [ ] 1.8 REFACTOR: extract `canonicalize_request` + `payload_hash` helpers.
+- [x] 1.7 GREEN: extend `backend/app/shared/messaging/idempotency.py` — `claim`/`complete_with_response`/`fetch_cached`/`release_claim`; advisory-lock helper; 16 KiB cap; rollback removes uncommitted claim.
+- [x] 1.8 REFACTOR: extract `canonicalize_request` + `payload_hash` helpers.
 
 ## Phase 2: Slice 2 — Decimal Payment Policy + Failure + ADR
 
