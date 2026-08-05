@@ -1,5 +1,6 @@
 """Tests for AuthorizePayment use case."""
 
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -28,25 +29,35 @@ class TestAuthorizePayment:
     @pytest.mark.asyncio
     async def test_authorizes_successfully(self) -> None:
         repo = InMemoryPaymentRepository()
-        use_case = AuthorizePayment(repo, approval_policy=lambda amount, currency: True)
-        payment = await use_case.execute(order_id=uuid4(), amount=100.0, currency="USD")
+        use_case = AuthorizePayment(
+            repo, approval_policy=lambda order_id, amount, currency: True
+        )
+        payment = await use_case.execute(
+            order_id=uuid4(), amount=Decimal("100.00"), currency="USD"
+        )
 
         assert payment.status == "authorized"
-        assert payment.amount == 100.0
+        assert payment.amount == Decimal("100.00")
         assert len(repo.payments) == 1
 
     @pytest.mark.asyncio
     async def test_rejected_by_provider_raises(self) -> None:
         repo = InMemoryPaymentRepository()
         use_case = AuthorizePayment(
-            repo, approval_policy=lambda amount, currency: False
+            repo, approval_policy=lambda order_id, amount, currency: False
         )
         with pytest.raises(PaymentRejectedError, match="rejected by provider"):
-            await use_case.execute(order_id=uuid4(), amount=100.0, currency="USD")
+            await use_case.execute(
+                order_id=uuid4(), amount=Decimal("100.00"), currency="USD"
+            )
 
     @pytest.mark.asyncio
     async def test_invalid_amount_raises(self) -> None:
         repo = InMemoryPaymentRepository()
-        use_case = AuthorizePayment(repo, approval_policy=lambda amount, currency: True)
+        use_case = AuthorizePayment(
+            repo, approval_policy=lambda order_id, amount, currency: True
+        )
         with pytest.raises(PaymentRejectedError, match="Invalid amount"):
-            await use_case.execute(order_id=uuid4(), amount=0.0, currency="USD")
+            await use_case.execute(
+                order_id=uuid4(), amount=Decimal("0.00"), currency="USD"
+            )

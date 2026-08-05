@@ -1,12 +1,13 @@
 """AuthorizePayment use case."""
 
-import random
 from collections.abc import Callable
-from uuid import UUID, uuid4
 from datetime import datetime, timezone
+from decimal import Decimal
+from uuid import UUID, uuid4
 
 from app.modules.payments.domain.entities import Payment
 from app.modules.payments.domain.errors import PaymentRejectedError
+from app.modules.payments.domain.policy import is_payment_approved
 from app.modules.payments.domain.repository import PaymentRepository
 from app.modules.payments.domain.services import ensure_payment_amount_is_valid
 
@@ -15,19 +16,14 @@ class AuthorizePayment:
     def __init__(
         self,
         repository: PaymentRepository,
-        approval_policy: Callable[[float, str], bool] | None = None,
+        approval_policy: Callable[[str, Decimal, str], bool] | None = None,
     ) -> None:
         self._repository = repository
-        self._approval_policy = approval_policy or self._simulate_provider_authorization
+        self._approval_policy = approval_policy or is_payment_approved
 
-    @staticmethod
-    def _simulate_provider_authorization(amount: float, currency: str) -> bool:
-        del amount, currency
-        return random.choice([True, True, True, False])
-
-    async def execute(self, order_id: UUID, amount: float, currency: str) -> Payment:
+    async def execute(self, order_id: UUID, amount: Decimal, currency: str) -> Payment:
         ensure_payment_amount_is_valid(amount)
-        if not self._approval_policy(amount, currency):
+        if not self._approval_policy(str(order_id), amount, currency):
             raise PaymentRejectedError("Payment was rejected by provider")
         payment = Payment(
             id=uuid4(),

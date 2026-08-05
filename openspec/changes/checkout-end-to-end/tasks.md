@@ -51,20 +51,20 @@ Chain ordering (feature-branch-chain): PR #1 (S1) targets the tracker branch `fe
 
 ## Phase 2: Slice 2 — Decimal Payment Policy + Failure + ADR
 
-- [ ] 2.1 RED: payment vectors + determinism — assert each tuple yields the same first digest byte across N=1000 evaluations and matches the verified fixtures:
+- [x] 2.1 RED: payment vectors + determinism — assert each tuple yields the same first digest byte across N=1000 evaluations and matches the verified fixtures:
   - V1 `00000000-0000-0000-0000-000000000001|19.99|USD` (UTF-8) → SHA-256 byte 0 = `0x12` (decimal 18, < 192 → approved).
   - V2 `00000000-0000-0000-0000-000000000001|0.00|USD` (UTF-8) → byte 0 = `0xc9` (decimal 201, ≥ 192 → declined).
   - V3 `00000000-0000-0000-0000-000000000001|19.90|USD` (canonical from `19.9`, UTF-8) → byte 0 = `0x09` (decimal 9, approved).
   - V4 `00000000-0000-0000-0000-000000000001|999.99|EUR` (UTF-8) → byte 0 = `0x27` (decimal 39, approved).
   - V5 `00000000-0000-0000-0000-000000000001|0.01|GBP` (UTF-8) → byte 0 = `0xd8` (decimal 216, declined).
   - V6 `ffffffff-ffff-ffff-ffff-ffffffffffff|19.99|USD` (UTF-8) → byte 0 = `0x34` (decimal 52, approved) — different order_id, same outcome class as V1 (proves order_id is in the digest).
-- [ ] 2.2 RED: `ProcessPaymentFailure` — persists `declined` Payment with `failure_reason`; does NOT mutate order.
-- [ ] 2.3 RED: `Decimal` amount validation — rejects >2 decimals and negatives.
-- [ ] 2.4 GREEN: `backend/app/modules/payments/domain/policy.py` (`is_payment_approved`, threshold 192, UTF-8 canonical bytes, threshold as module constant).
-- [ ] 2.5 GREEN: update `AuthorizePayment.execute` to call policy; persist `amount: Decimal`; remove `random.choice`.
-- [ ] 2.6 GREEN: update `PaymentModel.amount`→`Numeric(11,2)`; repo to `Decimal`.
-- [ ] 2.7 GREEN: implement `ProcessPaymentFailure.execute` to persist `declined` Payment (do NOT cancel).
-- [ ] 2.8 REFACTOR: update `docs/adr/0005-use-deterministic-simulated-payments.md` status → "Accepted (current implementation)".
+- [x] 2.2 RED: `ProcessPaymentFailure` — persists `declined` Payment with `failure_reason`; does NOT mutate order.
+- [x] 2.3 RED: `Decimal` amount validation — rejects >2 decimals and negatives.
+- [x] 2.4 GREEN: `backend/app/modules/payments/domain/policy.py` (`is_payment_approved`, threshold 192, UTF-8 canonical bytes, threshold as module constant).
+- [x] 2.5 GREEN: update `AuthorizePayment.execute` to call policy; persist `amount: Decimal`; remove `random.choice`.
+- [x] 2.6 GREEN: update `PaymentModel.amount`→`Numeric(11,2)`; repo to `Decimal`.
+- [x] 2.7 GREEN: implement `ProcessPaymentFailure.execute` to persist `declined` Payment (do NOT cancel).
+- [x] 2.8 REFACTOR: update `docs/adr/0005-use-deterministic-simulated-payments.md` status → "Accepted (current implementation)".
 
 ## Phase 3: Slice 3 — Inventory Lock + Checkout + API + E2E
 

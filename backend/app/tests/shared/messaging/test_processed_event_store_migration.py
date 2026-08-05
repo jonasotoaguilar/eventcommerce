@@ -226,7 +226,9 @@ class TestExtendCheckoutIdempotencyMigration:
                 )
             )
 
-        _run([], migration_engine, "downgrade", "-1")
+        # The chain has grown since S1a (S2 adds payments.failure_reason), so
+        # downgrade to the explicit pre-S1a base to assert the legacy shape.
+        _run([], migration_engine, "downgrade", "4d6e7a8b9c0f")
 
         cols = _column_info(migration_engine, "processed_events")
         assert cols["event_id"]["data_type"] == "uuid"

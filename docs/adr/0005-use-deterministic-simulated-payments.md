@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted (MVP Target)
+Accepted (current implementation)
 
 ## Context
 
-`AuthorizePayment` currently uses `random.choice([True, True, True, False])` as the approval policy. This is useful for manual exploration but is not a reproducible business behavior. The portfolio needs a real payment bounded context without real card processing.
+`AuthorizePayment` previously used `random.choice([True, True, True, False])` as the approval policy. This was useful for manual exploration but is not a reproducible business behavior. The portfolio needs a real payment bounded context without real card processing.
 
 ## Decision
 
