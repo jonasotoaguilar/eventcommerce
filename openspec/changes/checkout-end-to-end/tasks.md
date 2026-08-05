@@ -83,9 +83,9 @@ Chain ordering (feature-branch-chain): PR #1 (S1) targets the tracker branch `fe
 - [x] 3.13 GREEN: `backend/app/modules/checkout/api/schemas.py` — `CheckoutRequest`: `customer_id`/`product_id` 1–128 chars, 1–100 unique items, `quantity` 1–10,000, `amount: Decimal` 0–999,999,999.99 with ≤2 decimals, `currency` three uppercase ASCII letters (syntactic ISO 4217 — does NOT prove currency existence; catalog/reconciliation deferred); optional `Idempotency-Key` 1–128 visible ASCII. `CheckoutResponse` carries `order_id`/`status`/nullable `cancel_reason`/nullable `payment_status`.
 - [x] 3.14 GREEN: `backend/app/modules/checkout/application/checkout.py` — one tx: claim→create order→lock+reserve→authorize+persist→confirm OR release+cancel→cache→COMMIT→best-effort notify in separate tx.
 - [x] 3.15 GREEN: `backend/app/modules/checkout/api/container.py` — request-local `AsyncSession`; wires all repos + use cases.
-- [ ] 3.16 GREEN: `backend/app/modules/checkout/api/routes.py` — `POST /api/v1/checkout` maps 201/422/409/500.
+- [x] 3.16 GREEN: `backend/app/modules/checkout/api/routes.py` — `POST /api/v1/checkout` maps 201/422/409/500.
 - [x] 3.17 GREEN: wire `OrdersContainer` with `ConfirmOrder`+`CancelOrder`+`ProcessOrderInventoryResult`; populate `PaymentsContainer` with `payment_repo`, `AuthorizePayment`, `ProcessPaymentFailure`.
-- [ ] 3.18 GREEN: include `checkout_router` in `backend/app/app.py` under `/api/v1`; structured logging `checkout_started/completed/replayed/conflict/rolled_back/notification_failed` with key-hash prefix only.
+- [x] 3.18 GREEN: include `checkout_router` in `backend/app/app.py` under `/api/v1`; structured logging `checkout_started/completed/replayed/conflict/rolled_back/notification_failed` with key-hash prefix only.
 - [x] 3.19 REFACTOR: extract `serialize_response`+`hash_key` helpers; assert `ProcessOrderInventoryResult` NOT invoked synchronously; verify `cancel_reason` set exactly once.
 - [x] 3.20 RED: single-terminal-transition ownership — for any checkout reaching a terminal state, assert exactly one terminal status mutation and final state is `confirmed` OR `cancelled` (never both, never twice); inner use cases do NOT mutate `status` or `cancel_reason`; verified by spying `Order.confirm`/`Order.cancel`.
 
