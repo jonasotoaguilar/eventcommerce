@@ -32,6 +32,7 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
             existing.status = payment.status
             existing.amount = payment.amount
             existing.currency = payment.currency
+            existing.failure_reason = payment.failure_reason
         else:
             orm = PaymentModel(
                 id=payment.id,
@@ -40,6 +41,7 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
                 amount=payment.amount,
                 currency=payment.currency,
                 created_at=payment.created_at,
+                failure_reason=payment.failure_reason,
             )
             self._session.add(orm)
         await self._session.flush()
@@ -52,4 +54,5 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
             amount=orm.amount,
             currency=orm.currency,
             created_at=orm.created_at,
+            failure_reason=orm.failure_reason,
         )

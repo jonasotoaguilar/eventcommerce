@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 
+from app.modules.checkout.api.container import checkout_container
+from app.modules.checkout.api.routes import router as checkout_router
 from app.modules.inventory.api.container import inventory_container
 from app.modules.inventory.api.routes import router as inventory_router
 from app.modules.notifications.api.container import notifications_container
@@ -18,6 +20,7 @@ def create_app() -> FastAPI:
     inventory_container.wire(modules=["app.modules.inventory.api.routes"])
     notifications_container.wire(modules=["app.modules.notifications.api.routes"])
     payments_container.wire(modules=["app.modules.payments.api.routes"])
+    checkout_container.wire(modules=["app.modules.checkout.api.routes"])
 
     app = FastAPI(
         title=settings.app_name,
@@ -33,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(inventory_router, prefix="/api/v1")
     app.include_router(payments_router, prefix="/api/v1")
     app.include_router(notifications_router, prefix="/api/v1")
+    app.include_router(checkout_router, prefix="/api/v1")
 
     return app
 
