@@ -15,12 +15,11 @@ notification_failed``.
 import logging
 from collections.abc import AsyncGenerator
 
-from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.checkout.api.container import CheckoutContainer, checkout_container
+from app.modules.checkout.api.container import checkout_container
 from app.modules.checkout.api.schemas import CheckoutRequest, VISIBLE_ASCII_PATTERN
 from app.modules.checkout.application.checkout import Checkout, CheckoutResult
 from app.modules.checkout.application.errors import IdempotencyConflictError
@@ -32,13 +31,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/checkout", tags=["checkout"])
 
 
-async def _checkout_db_session(
+async def _checkout_session_and_use_case(
     session: AsyncSession = Depends(get_db_session),
-) -> AsyncGenerator[AsyncSession, None]:
-    """Yield a DB session after overriding the container's session provider."""
+) -> AsyncGenerator[tuple[AsyncSession, Checkout], None]:
+    """Yield the request session and a checkout use case bound to it.
+
+    The container session override and the use-case construction happen
+    in the same event-loop tick, so concurrent requests can never read
+    another request's override: each use case is deterministically built
+    with its own session.
+    """
     checkout_container.session.override(session)
     try:
-        yield session
+        yield session, checkout_container.checkout()
     finally:
         checkout_container.session.reset_override()
 
@@ -59,7 +64,6 @@ def _with_idempotency_header(
 
 
 @router.post("", status_code=201)
-@inject
 async def create_checkout(
     body: CheckoutRequest,
     idempotency_key: str | None = Header(
@@ -69,9 +73,11 @@ async def create_checkout(
         max_length=128,
         pattern=VISIBLE_ASCII_PATTERN.pattern,
     ),
-    session: AsyncSession = Depends(_checkout_db_session),
-    use_case: Checkout = Depends(Provide[CheckoutContainer.checkout]),
+    session_and_use_case: tuple[AsyncSession, Checkout] = Depends(
+        _checkout_session_and_use_case
+    ),
 ) -> JSONResponse:
+    session, use_case = session_and_use_case
     request = _with_idempotency_header(body, idempotency_key)
     key = request.idempotency_key
     key_hash = hash_key(key) if key is not None else ""

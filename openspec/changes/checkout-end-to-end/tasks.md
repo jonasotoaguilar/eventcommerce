@@ -75,11 +75,11 @@ Chain ordering (feature-branch-chain): PR #1 (S1) targets the tracker branch `fe
 - [x] 3.5 RED: happy path — `201`, `pending→confirmed`, `approved` Payment, inventory reserved, outbox rows, notification intent.
 - [x] 3.6 RED: payment decline — release, cancel `payment_declined`, `PaymentFailed` persisted, no double-charge, cancellation notification.
 - [x] 3.7 RED: insufficient stock — cancel `insufficient_stock`, no `approved` Payment, cancellation notification.
-- [ ] 3.8 RED: missing `Idempotency-Key` — two identical requests produce two distinct orders.
-- [ ] 3.9 RED: replay — cached original status+body, no re-execution.
-- [ ] 3.10 RED: key/payload mismatch — `409`, first execution intact.
-- [ ] 3.11 RED: concurrent duplicate — exactly one execution, identical terminal response.
-- [ ] 3.12 RED: notification — intent at every terminal state; post-commit `SendOrderNotification` failure does NOT roll back.
+- [x] 3.8 RED: missing `Idempotency-Key` — two identical requests produce two distinct orders.
+- [x] 3.9 RED: replay — cached original status+body, no re-execution.
+- [x] 3.10 RED: key/payload mismatch — `409`, first execution intact.
+- [x] 3.11 RED: concurrent duplicate — exactly one execution, identical terminal response.
+- [x] 3.12 RED: notification — intent at every terminal state; post-commit `SendOrderNotification` failure does NOT roll back.
 - [x] 3.13 GREEN: `backend/app/modules/checkout/api/schemas.py` — `CheckoutRequest`: `customer_id`/`product_id` 1–128 chars, 1–100 unique items, `quantity` 1–10,000, `amount: Decimal` 0–999,999,999.99 with ≤2 decimals, `currency` three uppercase ASCII letters (syntactic ISO 4217 — does NOT prove currency existence; catalog/reconciliation deferred); optional `Idempotency-Key` 1–128 visible ASCII. `CheckoutResponse` carries `order_id`/`status`/nullable `cancel_reason`/nullable `payment_status`.
 - [x] 3.14 GREEN: `backend/app/modules/checkout/application/checkout.py` — one tx: claim→create order→lock+reserve→authorize+persist→confirm OR release+cancel→cache→COMMIT→best-effort notify in separate tx.
 - [x] 3.15 GREEN: `backend/app/modules/checkout/api/container.py` — request-local `AsyncSession`; wires all repos + use cases.
