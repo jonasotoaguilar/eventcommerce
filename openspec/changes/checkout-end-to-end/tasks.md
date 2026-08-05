@@ -89,10 +89,24 @@ Chain ordering (feature-branch-chain): PR #1 (S1) targets the tracker branch `fe
 - [x] 3.19 REFACTOR: extract `serialize_response`+`hash_key` helpers; assert `ProcessOrderInventoryResult` NOT invoked synchronously; verify `cancel_reason` set exactly once.
 - [x] 3.20 RED: single-terminal-transition ownership — for any checkout reaching a terminal state, assert exactly one terminal status mutation and final state is `confirmed` OR `cancelled` (never both, never twice); inner use cases do NOT mutate `status` or `cancel_reason`; verified by spying `Order.confirm`/`Order.cancel`.
 
-## Phase 4: Slice 4 — Dead Stub Chore (Isolated)
+## Phase 4: Slice 4 — Dead Stub Chore (Isolated) ✅ COMPLETE (2026-08-05, committed on feat/checkout-s4-chore)
 
-- [ ] 4.1 Verify zero production import of `backend/app/modules/orders/infrastructure/repositories/sqlalchemy_repository.py` (grep across `app/`).
-- [ ] 4.2 Delete the file; full suite green.
+- [x] 4.1 Verify zero production import of `backend/app/modules/orders/infrastructure/repositories/sqlalchemy_repository.py` (grep across `app/`).
+- [x] 4.2 Delete the file; full suite green.
 
 ## Out of Scope
 Catalog, cart, IAM, AMQP consumer/scheduler/lifespan, 5-state order machine, confirm/cancel HTTP, stale-docs realignment. Threat matrix rows all N/A per design. Currency allowlist (e.g. `USD|EUR|GBP`) is NOT a task — checkout accepts syntactic ISO 4217 only; existence/allowlist reconciliation is a catalog follow-up.
+
+## Historical apply-run notes (preserved for audit; current tree is authoritative)
+
+- S1a apply run (2026-08-03): tasks 1.1, 1.5, 1.6 marked [x] — commit bb51484 on feat/checkout-s1a-migration (HEAD was 1a9e65e at that time).
+- Gate correction (2026-08-03): `chain_strategy: pending` → `feature-branch-chain` in all three delivery-metadata locations; no task definitions changed.
+- S1b apply run (2026-08-03): tasks 1.2, 1.3, 1.4, 1.7, 1.8 marked [x] — commit 6018493; S1 Phase 1 complete (8/8).
+- S2 apply run (2026-08-04): tasks 2.1–2.8 marked [x] — committed abad5cb on feat/checkout-s2-payment-policy (base 6018493). S2 Phase complete (8/8).
+- S3a apply run (2026-08-04): tasks 3.1–3.3 marked [x] — committed c388790 on feat/checkout-s3a-inventory-lock (base abad5cb).
+- S3b apply run (2026-08-05): tasks 3.4, 3.13 marked [x] — committed 0137294 on feat/checkout-s3b-checkout-contracts (base c388790).
+- S3c1 apply run (2026-08-05): tasks 3.5, 3.6, 3.7, 3.14, 3.19, 3.20 marked [x] — committed ea09b1b on feat/checkout-s3c1-orchestrator (base 0137294). 684 changed lines.
+- S3c2a apply run (2026-08-05): tasks 3.15, 3.17 marked [x] — committed 560e31c on feat/checkout-s3c2a-container (base ea09b1b).
+- S3c2b apply run (2026-08-05): tasks 3.16, 3.18 marked [x] — committed ec65e1d on feat/checkout-s3c2b-routes (base 560e31c). 348 changed lines.
+- S3c2c apply run (2026-08-05): tasks 3.8–3.12 marked [x] — committed on feat/checkout-s3c2c-e2e (base ec65e1d). 380 changed lines; 8 HTTP E2E tests; routes.py concurrency fix. S3 complete (20/20).
+- S4 apply run (2026-08-05): tasks 4.1, 4.2 marked [x] — committed on feat/checkout-s4-chore (base 505c225). Zero references to `orders.infrastructure.repositories.sqlalchemy_repository`; deleted 19-line stub; full suite 246 passed, ruff clean, pyrefly 0 errors. S4 complete (2/2) — ALL tasks done.
