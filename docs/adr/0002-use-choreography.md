@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted (MVP Target)
+Partially implemented
 
 ## Context
 
-The published Git base currently lacks transactional outbox, idempotency, and RabbitMQ messaging primitives. The MVP choreography wiring requires all four bounded contexts (`orders`, `inventory`, `payments`, `notifications`) to react to domain events without a central orchestrator.
+The messaging primitives this decision depends on now exist: the shared event envelope, the transactional outbox (`outbox_events` + `SqlAlchemyOutboxRepository`), and the idempotency store (`processed_events` + `ProcessedEventStore`) are implemented and exercised by the synchronous checkout path. The full choreography wiring is not delivered: there is no outbox worker/scheduler lifespan integration, no RabbitMQ publisher connection, and no AMQP consumer, so no context reacts to a published event. The current checkout is a deliberate synchronous commerce path.
 
 ## Decision
 
@@ -21,7 +21,7 @@ Use event choreography for the MVP: contexts react to events published via the t
 
 ## Consequences
 
-- **Positive**: aligns with the planned outbox and envelope; lets each context evolve independently.
+- **Positive**: aligns with the implemented outbox and envelope; lets each context evolve independently.
 - **Negative**: distributed compensations (e.g., release inventory on payment failure) are harder to trace than a saga log.
 - **Neutral**: future evolution to an orchestrated saga or hybrid is not precluded.
 
@@ -30,5 +30,7 @@ Use event choreography for the MVP: contexts react to events published via the t
 - [PRD.md](../../PRD.md) — MVP Target / coordination model
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — Patterns
 - [GLOSSARY.md](../GLOSSARY.md) — choreography, transactional outbox, idempotency
-- `backend/app/shared/messaging/outbox_repository.py` (Target)
-- `backend/app/shared/messaging/idempotency.py` (Target)
+- `backend/app/shared/messaging/outbox_repository.py` — implemented outbox repository
+- `backend/app/shared/messaging/idempotency.py` — implemented idempotency store
+- `backend/app/shared/messaging/rabbitmq_publisher.py` — publisher module exists; not wired
+- `backend/app/shared/messaging/outbox_worker.py` — worker module exists; no scheduler/lifespan integration

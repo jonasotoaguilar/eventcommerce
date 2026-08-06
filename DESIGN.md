@@ -125,7 +125,7 @@ components:
 # Design
 
 > **Target Design Notice**
-> This document describes the intended user experience for the eventcommerce MVP. The project currently has no frontend implementation and the `frontend/` directory is reserved. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), system structure in [ARCHITECTURE.md](./ARCHITECTURE.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
+> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes a synchronous `POST /api/v1/checkout` and an orders HTTP API, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), system structure in [ARCHITECTURE.md](./ARCHITECTURE.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
 
 ## Overview
 
@@ -142,7 +142,7 @@ This document owns the target screen map, user flows, visual tokens, component s
 | Browse catalog | API-only; no UI | Catalog page with filters, search, and stock signal |
 | Add to cart | API-only; no UI | Cart drawer/page with line items, quantities, and subtotal |
 | Review checkout | API-only; no UI | Checkout summary with shipping, payment stub, and place-order CTA |
-| Place order | `POST /api/v1/orders` | Same endpoint, surfaced through checkout form |
+| Place order | `POST /api/v1/checkout` (synchronous) | Same commerce path, surfaced through a checkout form |
 | View order status | `GET /api/v1/orders/{id}` | Order tracking page with live status and timeline |
 | Receive result | Raw JSON response | In-context success, failure, or pending message |
 
@@ -172,6 +172,8 @@ flowchart TD
     H --> K[Poll or listen for update]
     K --> E
 ```
+
+The current backend resolves checkout synchronously: `POST /api/v1/checkout` returns a terminal `confirmed` or `cancelled` order in one request, so the `Still waiting` / poll path above only applies once event-driven consumption is wired (MVP Target).
 
 ## Screen inventory
 

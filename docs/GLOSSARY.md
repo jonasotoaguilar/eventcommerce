@@ -12,21 +12,22 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 
 | Term | Definition | Horizon |
 |---|---|---|
-| Bounded context | A module that owns its own domain model, data, and invariants (e.g., `orders`, `inventory`). | Now / Target |
-| Event envelope | The canonical wire format that carries event metadata and payload across contexts. | MVP Target |
+| Bounded context | A module that owns its own domain model, data, and invariants (e.g., `orders`, `inventory`, `checkout`). | Now / Target |
+| Event envelope | The canonical wire format that carries event metadata and payload across contexts. The model exists at `backend/app/shared/messaging/envelope.py`; using it across contexts via a broker is MVP Target. | Now (structure) / Target (use) |
 | Choreography | Contexts react to published events rather than following a central orchestrator. | MVP Target |
-| Transactional outbox | Events are persisted atomically with business state, then forwarded to a broker. | MVP Target |
-| Idempotency | Processing the same event twice must not duplicate side effects. | MVP Target |
-| Deterministic simulated payment | A payment provider that returns the same authorization result for the same inputs. | MVP Target |
+| Transactional outbox | Events are persisted atomically with business state, then forwarded to a broker. Emission is implemented (`outbox_events`); forwarding to a broker is not wired. | Now (emission) / Target (forwarding) |
+| Idempotency | Processing the same event twice must not duplicate side effects. Implemented for the checkout path (`processed_events`); wired AMQP consumers are MVP Target. | Now (checkout path) |
+| Deterministic simulated payment | A payment provider that returns the same authorization result for the same inputs. Implemented in `backend/app/modules/payments/domain/policy.py` (ADR 0005). | Now |
 
 ### Bounded contexts
 
 **Current contexts** (`backend/app/modules/`):
 
 - `orders` — order lifecycle and state machine.
-- `inventory` — stock reservation and release.
-- `payments` — authorization and failure handling.
-- `notifications` — reactions to order events.
+- `checkout` — synchronous commerce orchestrator (`POST /api/v1/checkout`).
+- `inventory` — stock reservation and release with row-level locking.
+- `payments` — authorization and failure handling behind a deterministic policy.
+- `notifications` — best-effort notification intent.
 
 **Target contexts** (MVP):
 
@@ -36,47 +37,42 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 
 ## Events
 
-Current events live in per-module `domain/events/` files. The shared envelope and the target event vocabulary are **MVP Target** and will live in `backend/app/shared/messaging/envelope.py`.
+The shared envelope at `backend/app/shared/messaging/envelope.py` defines the canonical `event_type` literal: `OrderCreated`, `InventoryReserved`, `InventoryRejected`, `OrderConfirmed`, and `OrderCancelled`. The shared event store (`backend/app/shared/events/`) persists timeline events; the transactional outbox (`backend/app/shared/messaging/outbox_repository.py`) persists events for later forwarding. Only the `orders` context defines domain event dataclasses today (`backend/app/modules/orders/domain/events.py`); inventory, payments, and notifications have no per-module events module.
 
 ### Current events (Now)
 
 | Event | Meaning | Producer | Consumer | Code path |
 |---|---|---|---|---|
-| `OrderCreated` | A shopper submitted a checkout and an order aggregate was created. | `orders` | `inventory` (Target), `notifications` (Target) | `backend/app/modules/orders/domain/events/order_events.py` |
-| `InventoryReserved` | Requested stock was reserved successfully. | `inventory` | `orders` (Target), `payments` (Target) | `backend/app/modules/inventory/domain/events/inventory_events.py` |
-| `PaymentAuthorized` | A payment was authorized for the order. | `payments` | `orders` (Target), `notifications` (Target) | `backend/app/modules/payments/domain/events/payment_events.py` |
-| `OrderNotificationSent` | A notification was dispatched for an order. | `notifications` | — | `backend/app/modules/notifications/domain/events/notification_events.py` |
+| `OrderCreated` | A shopper submitted a checkout and an order aggregate was created. | `orders` (via `CreateOrder`) | AMQP consumers (Target) | `backend/app/modules/orders/domain/events.py`; persisted to `domain_events` and `outbox_events` |
+| `OrderConfirmed` | The order reached the `confirmed` terminal state. | `checkout` | Notifications (best-effort sync); AMQP consumers (Target) | Outbox write in `backend/app/modules/checkout/application/checkout.py` |
+| `OrderCancelled` | The order reached the `cancelled` terminal state. | `checkout` | Inventory release (on payment failure); AMQP consumers (Target) | Outbox write in `backend/app/modules/checkout/application/checkout.py` |
+| `InventoryReserved` | Requested stock was reserved successfully. | `checkout` (via inventory use cases) | AMQP consumers (Target) | Envelope literal; `orders/domain/events.py` dataclass |
+| `InventoryRejected` | Requested stock could not be reserved. | `checkout` (via inventory use cases) | AMQP consumers (Target) | Envelope literal; `orders/domain/events.py` dataclass |
 
-### Target events (MVP Target)
+### Consumer wiring (MVP Target)
 
-The choreography target adds the shared envelope and these additional events:
-
-| Event | Meaning | Producer | Consumer |
-|---|---|---|---|
-| `InventoryRejected` | Requested stock could not be reserved. | `inventory` | `orders` |
-| `OrderConfirmed` | The order reached a terminal successful state. | `orders` | `notifications` |
-| `OrderCancelled` | The order reached a terminal cancelled state. | `orders` | `inventory`, `notifications` |
+The choreography target wires these events to consumers through the outbox, RabbitMQ publisher, and AMQP consumer. When that wiring is live, `OrderCreated` triggers inventory reservation, `InventoryReserved` / `InventoryRejected` drive order confirmation or cancellation, and terminal events trigger notifications. Until then, none of these events are forwarded to a broker and no consumer reacts to them.
 
 ## State vocabulary
 
 ### Order status
 
-Order statuses are `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, and `cancelled`. The allowed transitions are defined by `can_transition` in `backend/app/modules/orders/domain/services/order_domain_service.py`.
+Order statuses are `pending`, `confirmed`, and `cancelled` in the current machine, with `inventory_reserved` and `payment_authorized` reserved for the MVP Target five-state lifecycle. The allowed transitions are defined by `can_transition` in `backend/app/modules/orders/domain/services.py`.
 
 | From | To | Allowed | Notes |
 |---|---|---|---|
-| `pending` | `inventory_reserved` | Yes | Triggered after stock reservation succeeds. |
-| `pending` | `cancelled` | Yes | Triggered when stock is rejected or payment is rejected. |
-| `inventory_reserved` | `payment_authorized` | Yes | Triggered after payment authorization succeeds. |
-| `inventory_reserved` | `cancelled` | Yes | Triggered when payment is rejected. |
-| `payment_authorized` | `confirmed` | Yes | Triggered after final acceptance. |
-| `payment_authorized` | `cancelled` | Yes | Triggered when final acceptance fails. |
-| `confirmed` | `pending` / `inventory_reserved` / `payment_authorized` / `cancelled` | No | Terminal state. |
-| `cancelled` | `pending` / `inventory_reserved` / `payment_authorized` / `confirmed` | No | Terminal state. |
+| `pending` | `confirmed` | Yes | Reached by the synchronous checkout when payment is authorized. |
+| `pending` | `cancelled` | Yes | Reached when stock is rejected or payment is rejected. |
+| `confirmed` | `confirmed` | Yes | Idempotent self-transition; terminal state. |
+| `cancelled` | `cancelled` | Yes | Idempotent self-transition; terminal state. |
+| `confirmed` | any other | No | Terminal state. |
+| `cancelled` | any other | No | Terminal state. |
+
+MVP Target adds the intermediate states: `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`, with cancellation allowed from any non-terminal state.
 
 ## Maintenance
 
 1. A code-contract change (event name, order status, bounded-context name, stack component) must update this glossary and any affected root doc in the same change.
-2. The **Current events** table reflects the per-module `domain/events/` files. The **Target events** table will match the `event_type` `Literal[...]` in `backend/app/shared/messaging/envelope.py` once the envelope is implemented.
-3. The **Order status** transitions must match `backend/app/modules/orders/domain/services/order_domain_service.py` exactly.
-4. Do not describe unwired AMQP consumers or absent shared infrastructure as live. Use `MVP Target` for capabilities that have no code in the published tree.
+2. The **Current events** table reflects the shared envelope `event_type` literal in `backend/app/shared/messaging/envelope.py`, the domain event dataclasses in `backend/app/modules/orders/domain/events.py`, and the outbox emissions from the checkout path. Keep it in sync with those files.
+3. The **Order status** transitions must match `backend/app/modules/orders/domain/services.py` exactly.
+4. Do not describe unwired AMQP consumers or absent broker wiring as live. Use `MVP Target` for capabilities that have no runtime wiring; use `Now (emission)` / `Target (forwarding)` for partial capabilities.
