@@ -22,11 +22,11 @@ auto-chain; chain strategy resolved by user: stacked-to-main — PR 1 → PR 4 e
 
 ## Phase 1: Foundation
 
-- [ ] 1.1 Correct `specs/project-foundation-docs/spec.md`: `InventoryRejected`/`OrderConfirmed`/`OrderCancelled` → Current Events (delivered-evidence); no AMQP-live claim pre-ship.
-- [ ] 1.2 RED→GREEN `create_order.py` + test: `OrderCreated` row carries `customer_id` + `items` (API + checkout).
-- [ ] 1.3 Migration `alembic/versions/<rev>_index_pending_outbox.py` (head `8d9e0f1a2b3c`): additive `(status, created_at)` index; downgrade drops.
-- [ ] 1.4 RED→GREEN `outbox_repository.py` + test: `get_pending` claims `FOR UPDATE SKIP LOCKED`, ordered, capped; disjoint workers.
-- [ ] 1.5 RED→GREEN `outbox_worker.py` + test: publish failure leaves row pending + logs + continues; publish only after confirm.
+- [x] 1.1 Correct `specs/project-foundation-docs/spec.md`: `InventoryRejected`/`OrderConfirmed`/`OrderCancelled` → Current Events (delivered-evidence); no AMQP-live claim pre-ship.
+- [x] 1.2 RED→GREEN `create_order.py` + test: `OrderCreated` row carries `customer_id` + `items` (API + checkout).
+- [x] 1.3 Migration `alembic/versions/<rev>_index_pending_outbox.py` (head `8d9e0f1a2b3c`): additive `(status, created_at)` index; downgrade drops.
+- [x] 1.4 RED→GREEN `outbox_repository.py` + test: `get_pending` claims `FOR UPDATE SKIP LOCKED`, ordered, capped; disjoint workers.
+- [x] 1.5 RED→GREEN `outbox_worker.py` + test: publish failure leaves row pending + logs + continues; publish only after confirm.
 
 ## Phase 2: Runtime bootstrap
 

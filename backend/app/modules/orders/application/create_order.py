@@ -43,17 +43,24 @@ class CreateOrder:
             customer_id=customer_id,
             items=items,
         )
+        payload = {
+            "customer_id": customer_id,
+            "items": [
+                {"product_id": item.product_id, "quantity": item.quantity}
+                for item in items
+            ],
+        }
         await self._event_repo.add(
             event_id=event.event_id,
             aggregate_type="order",
             aggregate_id=str(event.aggregate_id),
             event_type="OrderCreated",
             occurred_at=event.occurred_at,
-            payload={"customer_id": customer_id},
+            payload=payload,
         )
         await self._outbox.save(
             event_type="OrderCreated",
             aggregate_id=str(order.id),
-            payload={"customer_id": customer_id},
+            payload=payload,
         )
         return order

@@ -21,9 +21,9 @@ Docs MUST honor the source hierarchy. Published Git Now is the binding reference
 
 | Contract | Value | Evidence |
 |---|---|---|
-| Current Events | `OrderCreated` (orders), `InventoryReserved` (inventory), `PaymentAuthorized` (payments), `OrderNotificationSent` (notifications) | `backend/app/modules/*/domain/events/*.py` per-module dataclasses |
+| Current Events | `OrderCreated` (orders), `InventoryReserved` (inventory), `InventoryRejected` (orders/inventory), `OrderConfirmed` (orders/checkout), `OrderCancelled` (orders/checkout), `PaymentAuthorized` (payments), `OrderNotificationSent` (notifications) | `backend/app/modules/orders/domain/events.py`, `backend/app/modules/{checkout,inventory,orders}/application/`, and the existing event-store/outbox tests |
 | State Machine | `pending→{confirmed,cancelled}` (Phase 1; self-transitions allowed for idempotency) | `backend/app/modules/orders/domain/services.py` `can_transition()` |
-| Shared messaging runtime | Outbox repository + worker (claims `FOR UPDATE SKIP LOCKED`, indexed `(status, created_at)`), persistent RabbitMQ publisher (header-based wire format), shared consumer runtime with durable queues `inventory.order_created` / `orders.inventory_result` / `notifications.order_terminal` | `backend/app/shared/messaging/` |
+| Shared messaging foundation | Event store, transactional outbox, idempotency primitives, and the PR1 outbox durability work; AMQP publisher forwarding and consumer runtime are not live before their later runtime slices | `backend/app/shared/events/`, `backend/app/shared/messaging/`, `backend/app/modules/checkout/application/` |
 | Current Contexts | `orders`, `inventory`, `payments`, `notifications` | `backend/app/modules/` |
 | Stack | Py3.13+, FastAPI, SQLAlchemy 2 async, Pydantic Settings 2.x, Alembic, `uv` | Published code |
 
@@ -31,7 +31,7 @@ Docs MUST honor the source hierarchy. Published Git Now is the binding reference
 
 | Contract | Value |
 |---|---|
-| Target Events | `InventoryRejected`, `OrderConfirmed`, `OrderCancelled` (shared envelope) |
+| Target Delivery | AMQP forwarding and consumer delivery of the current event vocabulary (shared envelope) |
 | Target Contexts | `iam`, `catalog`, `cart` |
 | Target Stack | `dependency-injector`, `aio-pika`, shared event store, outbox, idempotency store |
 

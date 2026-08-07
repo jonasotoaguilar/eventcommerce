@@ -54,6 +54,7 @@ class SqlAlchemyOutboxRepository:
             .where(OutboxEventModel.status == "pending")
             .order_by(OutboxEventModel.created_at)
             .limit(limit)
+            .with_for_update(skip_locked=True)
         )
         return [OutboxEvent(row) for row in result.scalars().all()]
 
