@@ -182,7 +182,6 @@ class TestDispatch:
 
     @pytest.mark.asyncio
     async def test_success(self, caplog):
-        secret = "cus_secret_123"
         factory, handler = _hf()
         sf = _sf()
         c = MessageConsumer(
@@ -196,19 +195,20 @@ class TestDispatch:
         )
         await _connect(c)
         m = _msg(
-            body=json.dumps({"customer_id": secret}).encode(),
+            body=json.dumps({"customer_id": "cus_secret_123"}).encode(),
             et="OrderCreated",
             aid="agg-123",
+            mid="evt-123",
         )
-        m.message_id = "evt-123"
         with caplog.at_level(logging.INFO, logger="app.shared.messaging.consumer"):
             await c._handle_message(m)
         m.ack.assert_awaited_once()
         m.nack.assert_not_awaited()
         factory.assert_called_once()
         handler.assert_awaited_once()
-        assert secret not in caplog.text
-        assert handler.await_args.kwargs.get("payload") == {"customer_id": secret}
+        assert "cus_secret_123" not in caplog.text
+        args = handler.await_args
+        assert args and args.kwargs.get("payload") == {"customer_id": "cus_secret_123"}
         assert factory.call_args[0][0] is sf._mock_session
 
     @pytest.mark.asyncio
