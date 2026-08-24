@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     rabbitmq_port: str = Field(default="5672", alias="EVENTCOMMERCE_RABBITMQ_PORT")
     rabbitmq_vhost: str = Field(default="/", alias="EVENTCOMMERCE_RABBITMQ_VHOST")
 
+    rabbitmq_outbox_poll_interval: float = Field(
+        default=1.0, alias="EVENTCOMMERCE_RABBITMQ_OUTBOX_POLL_INTERVAL"
+    )
+    rabbitmq_outbox_batch_size: int = Field(
+        default=100, alias="EVENTCOMMERCE_RABBITMQ_OUTBOX_BATCH_SIZE"
+    )
+
     @computed_field
     def database_url(self) -> str:
         return (

@@ -1,11 +1,15 @@
 """RabbitMQ publisher implementation using aio-pika."""
 
 import json
+import logging
 from typing import Any
 
 import aio_pika
+from aio_pika import DeliveryMode
 
 from app.shared.messaging.outbox_repository import OutboxEvent
+
+logger = logging.getLogger(__name__)
 
 
 class RabbitMQPublisher:
@@ -29,6 +33,7 @@ class RabbitMQPublisher:
         message = aio_pika.Message(
             body=json.dumps(event.payload).encode(),
             content_type="application/json",
+            delivery_mode=DeliveryMode.PERSISTENT,
             message_id=str(event.id),
             headers={
                 "event_type": event.event_type,
@@ -36,6 +41,12 @@ class RabbitMQPublisher:
             },
         )
         await self._exchange.publish(message, routing_key=event.event_type)
+        logger.info(
+            "rabbitmq_publish event_id=%s event_type=%s aggregate_id=%s",
+            event.id,
+            event.event_type,
+            event.aggregate_id,
+        )
 
     async def close(self) -> None:
         if self._connection is not None:
