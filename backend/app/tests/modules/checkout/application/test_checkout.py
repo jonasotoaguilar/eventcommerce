@@ -182,6 +182,11 @@ class TestCheckoutIntegration:
             "OrderCreated",
             "OrderConfirmed",
         }
+        created = next(row for row in outbox if row.event_type == "OrderCreated")
+        assert created.payload == {
+            "customer_id": "cus_1",
+            "items": [{"product_id": "P1", "quantity": 2}],
+        }
 
         notifications = (
             (await db_session.execute(select(NotificationModel))).scalars().all()
