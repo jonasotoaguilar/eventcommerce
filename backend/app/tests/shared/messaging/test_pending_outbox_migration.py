@@ -39,14 +39,14 @@ class TestPendingOutboxMigration:
 
     @pytest.mark.asyncio
     async def test_upgrade_creates_composite_index_and_downgrade_removes_it(
-        self, db_session
+        self, db_session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         migration = _load_migration()
         connection = await db_session.connection()
 
         def apply_migration(sync_connection) -> tuple[list[dict], list[dict]]:
             operations = Operations(MigrationContext.configure(sync_connection))
-            migration.op = operations
+            monkeypatch.setattr(migration, "op", operations, raising=False)
             migration.upgrade()
             upgraded = inspect(sync_connection).get_indexes("outbox_events")
             migration.downgrade()
