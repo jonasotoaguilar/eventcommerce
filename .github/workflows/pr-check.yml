@@ -14,16 +14,20 @@ jobs:
         with:
           script: |
             const body = context.payload.pull_request.body || '';
-            const pattern = /(?:closes|fixes|resolves)\s+#(\d+)/gi;
+            const pattern = /(?:closes|fixes|resolves|related to|relates to|part of)\s+#(\d+)/gi;
             const matches = [...body.matchAll(pattern)];
 
             if (matches.length === 0) {
               core.setFailed(
                 '❌ PR body must reference a linked issue using one of:\n' +
-                '  - Closes #<number>\n' +
+                '  - Closes #<number> (closes issue on merge)\n' +
                 '  - Fixes #<number>\n' +
-                '  - Resolves #<number>\n\n' +
-                'Every EventCommerce PR must be linked to an approved issue.'
+                '  - Resolves #<number>\n' +
+                '  - Related to #<number> (does not close issue)\n' +
+                '  - Relates to #<number>\n' +
+                '  - Part of #<number>\n\n' +
+                'Every EventCommerce PR must be linked to an approved issue.\n' +
+                'Intermediate chained slices may use Related to / Relates to / Part of; only the final slice should use Closes / Fixes / Resolves.'
               );
             } else {
               const numbers = matches.map(m => `#${m[1]}`).join(', ');
@@ -41,7 +45,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const body = context.payload.pull_request.body || '';
-            const pattern = /(?:closes|fixes|resolves)\s+#(\d+)/gi;
+            const pattern = /(?:closes|fixes|resolves|related to|relates to|part of)\s+#(\d+)/gi;
             const matches = [...body.matchAll(pattern)];
 
             if (matches.length === 0) {
