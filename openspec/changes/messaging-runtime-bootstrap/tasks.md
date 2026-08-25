@@ -45,7 +45,7 @@ auto-chain; chain strategy resolved by user: stacked-to-main — PR 1 → PR 4 e
 
 ## Phase 4: Chain, integration, CI, docs
 
-- [ ] 4.1 RED→GREEN chain e2e `test_chain_e2e.py` (runtime/): fake publisher, order→inventory→terminal; no broker in default suite.
+- [x] 4.1 RED→GREEN chain e2e `test_chain_e2e.py` (runtime/): fake publisher, order→inventory→terminal; no broker in default suite.
 - [ ] 4.2 GREEN gated integration test `test_rabbitmq_integration.py` (integration/, skip unless env set): restart persistence, topology recovery, EXPLAIN evidence.
 - [ ] 4.3 GREEN `.github/workflows/api-ci.yml`: rabbitmq service, gated env, integration job.
 - [ ] 4.4 GREEN docs (after 2.4): `ARCHITECTURE.md` matrix `implemented` + evidence; GLOSSARY wiring; ADR 0002 delivered; README snapshot; no premature AMQP claims.
