@@ -3,15 +3,15 @@
 ## Work Unit
 
 - Change: `messaging-runtime-bootstrap`
-- Work unit: `messaging-runtime-pr3a-inventory-terminal-guard` (task 3.1 only)
-- Scope: PR3a only, `inventory/application/order_status.py` + `orders/application/get_order_status.py` + guard in `process_inventory_reservation.py` + `test_inventory_terminal_guard.py`, stacked-to-main on branch `feat/messaging-inventory-handlers` from `origin/main` `5e16aec` (PR #67 merged)
+- Work unit: `messaging-runtime-pr3b-orders-terminal-guard` (task 3.2 only)
+- Scope: PR3b only, guard `process_inventory_result.py` + `test_order_result_terminal_guard.py`, stacked-to-main on branch `feat/messaging-order-result-guard` from `origin/main` `2e2bfd7` (PR #68 merged)
 - Artifact store: OpenSpec
-- Mode: Strict TDD (`uv run --project backend python -m pytest` from worktree root or `uv run python -m pytest` from backend)
+- Mode: Strict TDD (`uv run --project backend python -m pytest`)
 - Delivery: auto-chain, stacked-to-main; each PR targets `main` independently
 - Review budget: 400 complete changed lines; no size:exception
 - Status: success
-- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, security-and-hardening, source-driven-development, supabase-postgres-best-practices)
-- Previous apply-progress: PR2c `messaging-runtime-pr2c-runtime-lifecycle` on `cbb99e3`; PR2b `consumer registry`; PR2a `publisher-settings`; PR1 1.1–1.5 (Engram #5248)
+- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, code-simplification, review-reliability)
+- Previous apply-progress: PR3a `inventory-terminal-guard` on `2e2bfd7`; PR2c `cbb99e3`; PR2b `3d25e66`; PR1 1.1–1.5
 
 ## Phase Envelope
 
@@ -30,7 +30,8 @@
 - [x] 2.3 RED→GREEN `messaging_runtime.py` + `backend/app/tests/runtime/`: broker-down startup healthy, backoff (cap 30s); shutdown cancels scheduler, closes ≤10s.
 - [x] 2.4 GREEN `app.py` lifespan: non-fatal connect; start/stop runtime ordering.
 - [x] 2.5 GREEN `settings.py` + `.env.example`: `EVENTCOMMERCE_RABBITMQ_*` vars, poll interval, batch size.
-- [x] 3.1 RED→GREEN `inventory/application/order_status.py` (`OrderStatusQuery`) + `orders/application/get_order_status.py` + guard in `process_inventory_reservation.py` + test: terminal skip; duplicate once; no sync-checkout double reserve.
+- [x] 3.1 RED→GREEN `inventory/application/order_status.py` (`OrderStatusQuery`) + `get_order_status.py` + guard in `process_inventory_reservation.py` + test: terminal skip; duplicate once; no sync-checkout double reserve.
+- [x] 3.2 RED→GREEN guard `process_inventory_result.py` + test: late result on confirmed/cancelled no-ops, skip recorded.
 
 ## PR2a Implementation Summary (preserved)
 
@@ -59,6 +60,7 @@
 | 2.2 | `backend/app/tests/shared/messaging/test_consumer.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py` → **ModuleNotFoundError: No module named 'app.shared.messaging.consumer'** (RED proven: test imports `ConsumerBinding, MessageConsumer` before file exists; full failure log captured) | Created `test_consumer.py` with 5 tests (registry, durable topology, invalid acked, success, failure) → initial 3 failed `TypeError: 'coroutine' object does not support async context manager` due to `AsyncMock` for `session.begin` (proves implementation not yet correct) | Fixed `consumer.py` to use `MagicMock` for `session.begin` mock and `aio_pika` durable TOPIC + prefetch 1 + bind; then `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py -v` → **5 passed in 0.06s** (dup, durable with prefetch+bind+start no_ack, invalid acked covering unknown/missing mid/invalid json, success acked with payload-not-logged + handler factory session/payload check, failure nacked requeue) | Triangulation: `test_invalid_acked` exercises 3 malformed variants (unknown type, missing `message_id`, invalid JSON) all acked; `test_durable` checks 1+2+2 bindings =5 routes across 3 durable queues, prefetch 1, and `start` no_ack False; `test_success` checks `factory.call_args[0][0] is sf._mock_session` and `handler kwargs payload` plus `secret not in caplog.text`; `test_failure` checks `nack(requeue=True)` | No refactor needed; kept module cohesive minimal (ConsumerBinding + MessageConsumer, no compatibility layer) |
 | 2.5 | `backend/app/shared/config/settings.py` + `backend/.env.example` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/config/test_settings.py` → 4 passed in 0.01s | N/A — GREEN per tasks.md | Added `Field(alias=...)` poll/batch and verified via `Settings()` env override → 4 passed + manual check | N/A — single field defaults, no branching | N/A |
 | 3.1 | `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` + `inventory/application/order_status.py` + `orders/application/get_order_status.py` + `process_inventory_reservation.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py -v` → 5 passed; `backend/app/tests/runtime -v` → 11 passed (safety net) | `ModuleNotFoundError: No module named 'app.modules.inventory.application.order_status'` (RED: test imports protocol before file exists) | Created `order_status.py` (`@runtime_checkable` Protocol `get_status(UUID)->str|None`) + `get_order_status.py` (`GetOrderStatus` implements Protocol via `OrderRepository.get_by_id`, only `get_status`) + guard in `process_inventory_reservation.py` (`order_status: OrderStatusQuery` required, idempotency first, then `UUID(str(order_id))` → `get_status` → if `confirmed`/`cancelled` → `mark_processed` same consumer/event and return; pending/missing → preserve reservation; malformed UUID raises to consumer nack; duplicate via `is_processed` first) → `uv run --project backend python -m pytest ...test_inventory_terminal_guard.py -v` → 6 passed in 0.03s | Triangulate: `test_get_order_status_returns_status` checks confirmed/cancelled/None (no `execute` alias); `test_terminal_confirmed_skips` (counts, processed, duplicate no-ops) + `test_terminal_cancelled_skips` (second terminal variant); `test_duplicate_reserves_once` (pending duplicate once); `test_sync_checkout_double_reserve_prevented` (confirmed checkout 7/3 unchanged); `test_pending_and_missing_reserve` (pending/None reserves + malformed `order-123` raises `ValueError`, no reservation, no status call) | No new abstraction; guard minimal, no payload logging, required constructor injection — no 3-arg compatibility, no invalid-UUID fallback |
+| 3.2 | `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` + `process_inventory_result.py` guard | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed (safety net); DB `test_process_inventory_result.py` 3 errors `connection refused` honestly reported | `test_terminal_confirmed_late_reserved` → 1 == 0 `save_calls` failed; `test_terminal_skip_regardless` → `InvalidStateTransitionError: Cannot cancel order from status confirmed` — 3 failed, 2 passed proves RED before fix | Added `if order.status in ("confirmed","cancelled"): await mark_processed(event_id,"ProcessOrderInventoryResult"); return` after `is_processed`+`order-not-found` → `5 passed in 0.02s` | Triangulate: `test_terminal_cancelled_late_rejected` second terminal; `test_terminal_skip_regardless_of_result_value` proves `confirmed+rejected` and `cancelled+reserved` both no-op regardless of value (would raise without guard); `test_pending_reserved_confirms_and_pending_rejected_cancels` preserves pending→confirmed/cancelled + duplicate-once | No new abstraction; interface unchanged, no logging of payload/body/credentials, no OrderStatusQuery added |
 
 ## Work Unit Evidence (PR2b — consumer registry only)
 
@@ -138,3 +140,58 @@
 - `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` — 6 unit tests: GetOrderStatus `get_status` only, terminal confirmed/cancelled skip + processed + duplicate no-ops, duplicate once, sync-checkout 7/3 unchanged, pending/missing reserves + malformed raises `ValueError` (245 lines, broker-free)
 - `backend/app/tests/modules/inventory/application/test_process_inventory_reservation.py` + `backend/app/tests/test_core_flow.py` — wiring fixes: mandatory `GetOrderStatus`/`_FakePendingOrderStatus` injection, valid UUID `order_id`, no 3-arg path
 - `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.1 `[x]`, 3.2–3.4 and 4.x pending
+
+## PR3b — orders terminal guard (task 3.2 only, `messaging-runtime-pr3b-orders-terminal-guard`)
+
+- Scope: `backend/app/modules/orders/application/process_inventory_result.py` delta (+6) + `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` (219) — no OrderStatusQuery, no container/runtime/broker/CI/docs wiring (3.3/3.4/4.x remain pending); stacked-to-main on `feat/messaging-order-result-guard` from `2e2bfd7`.
+- Guard: after `is_processed` early return and `OrderNotFoundError` handling, if `order.status in ("confirmed","cancelled")` → `await mark_processed(event_id,"ProcessOrderInventoryResult")` and return without `save`/`event_repo.add`/`outbox.save`/re-transition; applies regardless of `result` value; preserves pending `reserved→confirmed`, `rejected→cancelled`, duplicate-once via `is_processed`; interface unchanged, no fallback, no payload logging.
+- TDD: RED `5 collected → 3 failed,2 passed` (confirmed save 1==0, cancelled save 1==0, confirmed+rejected InvalidStateTransition); GREEN `5 passed in 0.02s` after guard; TRIANGULATE `test_terminal_skip_regardless_of_result_value` (confirmed+rejected & cancelled+reserved both no-op), `test_pending_reserved_confirms_and_pending_rejected_cancels` (pending transitions + duplicate once), `test_order_not_found_still_raises`; REFACTOR none needed — minimal conditional.
+- Evidence: `uv run --project backend python -m pytest backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py -v` → 5 passed in 0.02s (terminal confirmed/cancelled skip + processed + duplicate no-ops, regardless-value skip, pending both paths + duplicate once, not-found raises). Safety net `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed; `uv run --project backend python -m pytest ...test_order_result_terminal_guard.py ...test_inventory_terminal_guard.py ...test_consumer.py ...runtime -v` → 27 passed; `uv run pyrefly check` → 0 errors; Ruff format/check ok; DB suite 3 errors `connection refused` honestly reported, no postgres locally.
+- Rollback: revert `process_inventory_result.py` (+6 guard lines) and `test_order_result_terminal_guard.py` (219) restores pre-guard behavior; `tasks.md` 3.2 `[x]` and `apply-progress.md` PR3b are SDD artifacts.
+- Next: `sdd-apply` for 3.3 (`process_order_notification`), 3.4 (container wiring supplying `GetOrderStatus`), then 4.x E2E/CI/docs; 3.3-3.4 and 4.x remain pending.
+
+## Work Unit Evidence (PR3b — orders terminal guard only)
+
+| Evidence | Required value | Result |
+|---|---|---|
+| Focused test command and exact result | Smallest command proving this unit; command, exit/result, and relevant counts | `uv run --project backend python -m pytest backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py -v` → **5 passed in 0.02s** (`test_terminal_confirmed_late_reserved_no_ops_skip_recorded`, `test_terminal_cancelled_late_rejected_no_ops_skip_recorded`, `test_terminal_skip_regardless_of_result_value`, `test_pending_reserved_confirms_and_pending_rejected_cancels`, `test_order_not_found_still_raises_and_not_marked`) |
+| Runtime harness command/scenario and exact result | Real integration/runtime path; explicit `N/A` only when no runtime boundary exists, with reason | Broker/DB-free fake-unit harness: `ProcessOrderInventoryResult(FakeOrderRepository, FakeEventRepository, FakeOutbox, FakeIdempotency)` with `Order(status=confirmed/cancelled/pending)` exercises terminal skip inside same consumer transaction; confirms no `save`/`add`/`outbox`, `mark_processed` recorded, duplicate is_processed no-op, pending transitions commit. Consumer/runtime harness preserved: `MessageConsumer` durable TOPIC + prefetch 1 + ack/nack via `test_consumer.py` 16 passed proves per-message transaction boundary still holds. DB `test_process_inventory_result.py` collected → 3 errors `psycopg.OperationalError connection refused` honestly reported — no local postgres, not fabricated. |
+| Rollback boundary | Exact files/behavior that can be reverted without removing unrelated work | Revert `backend/app/modules/orders/application/process_inventory_result.py` (remove 6-line terminal guard) and `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` (219 lines). Reverting restores late results re-transitioning or raising; `test_inventory_terminal_guard.py`/consumer/runtime/tasks remain untouched. |
+
+## Validation (post-format, pre-commit, PR3b)
+
+- `uv run --project backend ruff format backend/app/modules/orders/application/process_inventory_result.py backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` → `2 files left unchanged`
+- `uv run --project backend ruff check backend/app/modules/orders/application/process_inventory_result.py backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` → `All checks passed!`
+- `uv run --project backend pyrefly check` (via `cd backend`) → `0 errors`
+- `uv run --project backend python -m pytest backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py -v` → 5 passed in 0.02s
+- `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed
+- `uv run --project backend python -m pytest backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 27 passed
+- `uv run --project backend python -m pytest backend/app/tests/modules/orders/domain -v` → 16 passed; `backend/app/tests/modules/orders/application/test_process_inventory_result.py` → 3 errors `connection refused` honestly reported
+- `uv run --project backend ruff format --check` → already formatted; 3.2 only, 3.3-3.4/4.x pending
+
+## PR Boundary and Line Count (against `origin/main` `2e2bfd7`)
+
+- Branch: `feat/messaging-order-result-guard` from `origin/main` `2e2bfd7` (`feat(messaging): guard inventory reservations` #68 merged)
+- Tracked diff: `git diff 2e2bfd7 --stat` → 4 files, ~230 insertions (+6 process_inventory_result +219 guard test +1 tasks +~60 apply-progress), 0 deletions beyond task mark; complete `git diff origin/main --numstat` additions+deletions ≤400 (no size:exception, margin ~100)
+- Checkpoints: before edit `git diff --stat HEAD` 0 clean; after guard+test `git diff origin/main --numstat` ~225; after tasks+apply-progress ≤350; staged vs unstaged identical
+- Chain guidance: `stacked-to-main` — PR3b targets `main` after PR3a merges; no branch-to-branch; diff shows only PR3b work unit
+
+## Deviations from Design
+
+- None for task 3.2; guard implements exactly `design.md` terminal check via already-loaded `order.status`, `mark_processed` same `processed_events` row, no extra query or container wiring.
+
+## Risks
+
+- PostgreSQL unavailable locally — DB integration tests honestly `connection refused`, not a regression; fake-unit harness proves guard.
+- Budget: complete diff ≤400 inclusive, margin preserved; no `size:exception` needed.
+
+## Next Steps
+
+- Next recommended: `sdd-apply` for `messaging-runtime-pr3c-orders-notification` tasks 3.3–3.4, then pr4 chain/integration/CI/docs; keep each PR ≤400 stacked-to-main
+- Do not start 4.x until 3.3-3.4 merge
+
+## Relevant Files (PR3b)
+
+- `backend/app/modules/orders/application/process_inventory_result.py` — terminal guard after is_processed+not-found, `confirmed/cancelled` → `mark_processed` and return, no save/event/outbox (RED→GREEN)
+- `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` — 5 unit tests: terminal confirmed/cancelled skip + processed + duplicate, regardless-value skip (would raise without guard), pending both paths + duplicate once, not-found raises (RED→GREEN→TRIANGULATE)
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.2 `[x]`, 3.3-3.4/4.x pending

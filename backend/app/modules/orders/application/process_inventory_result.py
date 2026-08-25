@@ -32,6 +32,12 @@ class ProcessOrderInventoryResult:
         if order is None:
             raise OrderNotFoundError(f"Order {order_id} not found")
 
+        if order.status in ("confirmed", "cancelled"):
+            await self._idempotency.mark_processed(
+                event_id, "ProcessOrderInventoryResult"
+            )
+            return
+
         if result == "reserved":
             order.confirm()
             await self._order_repo.save(order)
