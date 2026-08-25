@@ -1,5 +1,8 @@
 """ProcessInventoryReservation use case."""
 
+from uuid import UUID
+
+from app.modules.inventory.application.order_status import OrderStatusQuery
 from app.modules.inventory.domain.errors import InsufficientStockError
 from app.modules.inventory.domain.repository import InventoryRepository
 from app.modules.inventory.domain.services import reserve_stock
@@ -13,15 +16,24 @@ class ProcessInventoryReservation:
         inventory_repo: InventoryRepository,
         outbox: SqlAlchemyOutboxRepository,
         idempotency: ProcessedEventStore,
+        order_status: OrderStatusQuery,
     ) -> None:
         self._inventory_repo = inventory_repo
         self._outbox = outbox
         self._idempotency = idempotency
+        self._order_status = order_status
 
     async def execute(self, event_id: str, order_id: str, items: list[dict]) -> None:
         if await self._idempotency.is_processed(
             event_id, "ProcessInventoryReservation"
         ):
+            return
+        order_uuid = UUID(str(order_id))
+        status = await self._order_status.get_status(order_uuid)
+        if status in ("confirmed", "cancelled"):
+            await self._idempotency.mark_processed(
+                event_id, "ProcessInventoryReservation"
+            )
             return
         try:
             for item in items:
