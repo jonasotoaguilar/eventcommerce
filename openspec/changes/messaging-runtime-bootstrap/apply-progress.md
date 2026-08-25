@@ -3,16 +3,15 @@
 ## Work Unit
 
 - Change: `messaging-runtime-bootstrap`
-- Work unit: `messaging-runtime-pr2c-runtime-lifecycle` (tasks 2.3 and 2.4 only)
-- Scope: PR2c only, tasks 2.3 `messaging_runtime.py` + `backend/app/tests/runtime/` + task 2.4 `app.py` lifespan, stacked-to-main on branch `feat/messaging-runtime-lifecycle` from `origin/main` `cbb99e3` (`feat(messaging): add consumer registry` merged)
+- Work unit: `messaging-runtime-pr3a-inventory-terminal-guard` (task 3.1 only)
+- Scope: PR3a only, `inventory/application/order_status.py` + `orders/application/get_order_status.py` + guard in `process_inventory_reservation.py` + `test_inventory_terminal_guard.py`, stacked-to-main on branch `feat/messaging-inventory-handlers` from `origin/main` `5e16aec` (PR #67 merged)
 - Artifact store: OpenSpec
 - Mode: Strict TDD (`uv run --project backend python -m pytest` from worktree root or `uv run python -m pytest` from backend)
-- Delivery: auto-chain, stacked-to-main; PR2b targets `main` (like PR2a), not branch-to-branch; independently reviewable
-- Review budget: 400 authored changed lines; current delta **380 lines** (29+166+130+55) authored, **400 complete** (393 add +7 del) (see PR Boundary) — **within budget, no size:exception**
+- Delivery: auto-chain, stacked-to-main; each PR targets `main` independently
+- Review budget: 400 complete changed lines; no size:exception
 - Status: success
-- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, observability-and-instrumentation, security-and-hardening, source-driven-development)
-- Previous apply-progress: `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` (PR2a `messaging-runtime-pr2a-publisher-settings`, 58 lines) and Engram #5248 `sdd/messaging-runtime-bootstrap/apply-progress` (PR1 1.1–1.5)
-- Narrowing note: PR2a had narrowed from a 630-line full-PR2 candidate (tasks 2.1–2.5) which exceeded budget and was blocked. PR2b continues the narrowed chain: only consumer registry (task 2.2) is implemented; tasks 2.3/2.4 lifecycle/runtime/app wiring and phase 3/4 remain pending.
+- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, security-and-hardening, source-driven-development, supabase-postgres-best-practices)
+- Previous apply-progress: PR2c `messaging-runtime-pr2c-runtime-lifecycle` on `cbb99e3`; PR2b `consumer registry`; PR2a `publisher-settings`; PR1 1.1–1.5 (Engram #5248)
 
 ## Phase Envelope
 
@@ -31,6 +30,7 @@
 - [x] 2.3 RED→GREEN `messaging_runtime.py` + `backend/app/tests/runtime/`: broker-down startup healthy, backoff (cap 30s); shutdown cancels scheduler, closes ≤10s.
 - [x] 2.4 GREEN `app.py` lifespan: non-fatal connect; start/stop runtime ordering.
 - [x] 2.5 GREEN `settings.py` + `.env.example`: `EVENTCOMMERCE_RABBITMQ_*` vars, poll interval, batch size.
+- [x] 3.1 RED→GREEN `inventory/application/order_status.py` (`OrderStatusQuery`) + `orders/application/get_order_status.py` + guard in `process_inventory_reservation.py` + test: terminal skip; duplicate once; no sync-checkout double reserve.
 
 ## PR2a Implementation Summary (preserved)
 
@@ -58,6 +58,7 @@
 | 2.1 | `backend/app/tests/shared/messaging/test_rabbitmq_publisher.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_rabbitmq_publisher.py` → 3 passed in 0.05s (safety net) | Added `test_publish_persistent_headers_no_payload_log` → **2 failed** `AssertionError: assert <DeliveryMode.NOT_PERSISTENT: 1> == <DeliveryMode.PERSISTENT: 2>` in 0.07s — proves test was written before fix | Fixed `rabbitmq_publisher.py` to set `DeliveryMode.PERSISTENT` + `logger.info` without payload → **4 passed in 0.05s** (3 existing + 1 new) | Same combined test also checks `message_id`/`aggregate_id` headers and `assert "cus_secret_123" not in caplog.text` with `caplog.at_level(logging.INFO, logger="app.shared.messaging.rabbitmq_publisher")` → 4 passed (triangulation: persistent + headers + payload-not-logged) | Merged two provisional tests into one combined assertion to stay under budget; no behavior refactor needed |
 | 2.2 | `backend/app/tests/shared/messaging/test_consumer.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py` → **ModuleNotFoundError: No module named 'app.shared.messaging.consumer'** (RED proven: test imports `ConsumerBinding, MessageConsumer` before file exists; full failure log captured) | Created `test_consumer.py` with 5 tests (registry, durable topology, invalid acked, success, failure) → initial 3 failed `TypeError: 'coroutine' object does not support async context manager` due to `AsyncMock` for `session.begin` (proves implementation not yet correct) | Fixed `consumer.py` to use `MagicMock` for `session.begin` mock and `aio_pika` durable TOPIC + prefetch 1 + bind; then `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py -v` → **5 passed in 0.06s** (dup, durable with prefetch+bind+start no_ack, invalid acked covering unknown/missing mid/invalid json, success acked with payload-not-logged + handler factory session/payload check, failure nacked requeue) | Triangulation: `test_invalid_acked` exercises 3 malformed variants (unknown type, missing `message_id`, invalid JSON) all acked; `test_durable` checks 1+2+2 bindings =5 routes across 3 durable queues, prefetch 1, and `start` no_ack False; `test_success` checks `factory.call_args[0][0] is sf._mock_session` and `handler kwargs payload` plus `secret not in caplog.text`; `test_failure` checks `nack(requeue=True)` | No refactor needed; kept module cohesive minimal (ConsumerBinding + MessageConsumer, no compatibility layer) |
 | 2.5 | `backend/app/shared/config/settings.py` + `backend/.env.example` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/config/test_settings.py` → 4 passed in 0.01s | N/A — GREEN per tasks.md | Added `Field(alias=...)` poll/batch and verified via `Settings()` env override → 4 passed + manual check | N/A — single field defaults, no branching | N/A |
+| 3.1 | `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` + `inventory/application/order_status.py` + `orders/application/get_order_status.py` + `process_inventory_reservation.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py -v` → 5 passed; `backend/app/tests/runtime -v` → 11 passed (safety net) | `ModuleNotFoundError: No module named 'app.modules.inventory.application.order_status'` (RED: test imports protocol before file exists) | Created `order_status.py` (`@runtime_checkable` Protocol `get_status(UUID)->str|None`) + `get_order_status.py` (`GetOrderStatus` implements Protocol via `OrderRepository.get_by_id`, only `get_status`) + guard in `process_inventory_reservation.py` (`order_status: OrderStatusQuery` required, idempotency first, then `UUID(str(order_id))` → `get_status` → if `confirmed`/`cancelled` → `mark_processed` same consumer/event and return; pending/missing → preserve reservation; malformed UUID raises to consumer nack; duplicate via `is_processed` first) → `uv run --project backend python -m pytest ...test_inventory_terminal_guard.py -v` → 6 passed in 0.03s | Triangulate: `test_get_order_status_returns_status` checks confirmed/cancelled/None (no `execute` alias); `test_terminal_confirmed_skips` (counts, processed, duplicate no-ops) + `test_terminal_cancelled_skips` (second terminal variant); `test_duplicate_reserves_once` (pending duplicate once); `test_sync_checkout_double_reserve_prevented` (confirmed checkout 7/3 unchanged); `test_pending_and_missing_reserve` (pending/None reserves + malformed `order-123` raises `ValueError`, no reservation, no status call) | No new abstraction; guard minimal, no payload logging, required constructor injection — no 3-arg compatibility, no invalid-UUID fallback |
 
 ## Work Unit Evidence (PR2b — consumer registry only)
 
@@ -106,6 +107,15 @@
 - **Next recommended**: `sdd-apply` for PR2c `messaging-runtime-pr2c-runtime` (tasks 2.3–2.4: `messaging_runtime.py` + `app.py` lifespan, broker-down healthy, backoff cap 30s, shutdown ≤10s) targeting `main` after PR2b merges, then Phase 3 handlers + Phase 4 E2E/CI/docs. Each will stay <400 and keep tests/docs with the unit they verify.
 - Do not start Phase 3 handlers or Phase 4 E2E/CI/docs until PR2b merges.
 
+## PR3a — inventory terminal guard (task 3.1 only, `messaging-runtime-pr3a-inventory-terminal-guard`)
+
+- Scope: `backend/app/modules/inventory/application/order_status.py` (11) + `backend/app/modules/orders/application/get_order_status.py` (19) + `backend/app/modules/inventory/application/process_inventory_reservation.py` delta (+12) + `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` (245) + `test_process_inventory_reservation.py` + `test_core_flow.py` wiring fixes from `origin/main` `5e16aec` (PR #67 merged) — no container/runtime/broker wiring (task 3.4 owns it); smallest explicit inventory-owned seam with required injection and typed aggregate ID.
+- Seam: `OrderStatusQuery` (`@runtime_checkable` Protocol, `get_status(UUID)->str|None`) in `inventory/application/order_status.py`; `GetOrderStatus` in `orders/application/get_order_status.py` implements it via `OrderRepository.get_by_id` (returns `order.status` or `None`, only `get_status` — no `execute` alias); `ProcessInventoryReservation` requires `order_status: OrderStatusQuery` (no default, no 3-arg path), checks `is_processed` first, then `UUID(str(order_id))` (malformed raises `ValueError` to consumer `nack(requeue=True)`) → `get_status` inside consumer transaction → if `confirmed`/`cancelled` → `mark_processed(event_id, "ProcessInventoryReservation")` same row and return without inventory/outbox mutation; pending/missing → preserve reserve/reject; handler failure still `nack(requeue=True)` via consumer.
+- Evidence: `uv run --project backend python -m pytest backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py -v` → 6 passed in 0.03s (terminal confirmed/cancelled skip + processed + duplicate no-ops, duplicate once, sync-checkout 7/3 unchanged, pending/missing reserves, malformed `order-123` raises `ValueError` with no reservation/no status call, GetOrderStatus confirmed/cancelled/None via `get_status` only). Safety net `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed (5 consumer + 11 runtime); `cd backend && uv run pyrefly check` → 0 errors; `ruff format/check` ok; DB suite 30 errors `connection refused` honestly reported.
+- Sync-checkout proof: inventory pre-reserved 7/3 via sync `Checkout` path (simulated `available=7 reserved=3`), async `OrderCreated` with `order_status=confirmed` → `ProcessInventoryReservation` guard skips, `available` stays 7, `reserved` stays 3, `outbox.events==[]`.
+- Rollback: revert 3 files + test (see Scope) restores 3-arg `ProcessInventoryReservation` without guard; `tasks.md` 3.1 [x] and `apply-progress.md` PR3a are SDD artifacts. No new deps, no global container wiring, never logs payload/body/credentials.
+- Next: `sdd-apply` for 3.2 (`process_inventory_result` terminal guard), 3.3 (notifications), 3.4 (container wiring supplying `GetOrderStatus`), then 4.x E2E/CI/docs; 3.2–3.4 and 4.x remain pending.
+
 ## Relevant Files
 
 - `backend/app/shared/messaging/consumer.py` — registry validation, durable TOPIC exchange, 3 durable queues, prefetch 1, 5 binds, ack after commit / nack requeue, transaction + handler factory boundaries, no-payload logging (RED→GREEN)
@@ -118,4 +128,13 @@
 
 - Scope: `messaging_runtime.py` (166) + `app.py` lifespan (+29) + `tests/runtime/` (185) from `cbb99e3`
 - Evidence: `uv run --project backend python -m pytest backend/app/tests/runtime -v` → 11 passed (8+3); `cd backend && uv run pyrefly check` → 0 errors; Ruff check/format ok
-- Next: `messaging-runtime-pr3-handlers` (3.1–3.4) then pr4 chain/integration/CI/docs; 3.x/4.x pending
+- Next (pre-PR3a): `messaging-runtime-pr3-handlers` (3.1–3.4) then pr4 chain/integration/CI/docs; 3.x/4.x pending
+
+## PR3a files (this slice)
+
+- `backend/app/modules/inventory/application/order_status.py` — inventory-owned `@runtime_checkable` Protocol `OrderStatusQuery.get_status(UUID)->str|None` (smallest seam, 11 lines)
+- `backend/app/modules/orders/application/get_order_status.py` — orders-owned `GetOrderStatus` implementing Protocol via `OrderRepository.get_by_id` (19 lines, only `get_status` — no `execute` alias)
+- `backend/app/modules/inventory/application/process_inventory_reservation.py` — required `order_status: OrderStatusQuery` injection (no default), idempotency first, then `UUID(str(order_id))` with typed contract (malformed raises), terminal guard inside consumer transaction, marks same `processed_events` row and returns without mutation (delta +12)
+- `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` — 6 unit tests: GetOrderStatus `get_status` only, terminal confirmed/cancelled skip + processed + duplicate no-ops, duplicate once, sync-checkout 7/3 unchanged, pending/missing reserves + malformed raises `ValueError` (245 lines, broker-free)
+- `backend/app/tests/modules/inventory/application/test_process_inventory_reservation.py` + `backend/app/tests/test_core_flow.py` — wiring fixes: mandatory `GetOrderStatus`/`_FakePendingOrderStatus` injection, valid UUID `order_id`, no 3-arg path
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.1 `[x]`, 3.2–3.4 and 4.x pending

@@ -15,13 +15,21 @@ from app.shared.messaging.outbox_repository import SqlAlchemyOutboxRepository
 from app.shared.messaging.idempotency import ProcessedEventStore
 
 
+class _FakePendingOrderStatus:
+    async def get_status(self, order_id):  # type: ignore[no-untyped-def]
+        return "pending"
+
+
 class TestProcessInventoryReservation:
     @pytest.mark.asyncio
     async def test_reserves_inventory_and_emits_reserved(self, db_session) -> None:
         inv_repo = SqlAlchemyInventoryRepository(db_session)
         outbox_repo = SqlAlchemyOutboxRepository(db_session)
         idempotency = ProcessedEventStore(db_session)
-        use_case = ProcessInventoryReservation(inv_repo, outbox_repo, idempotency)
+        order_status = _FakePendingOrderStatus()
+        use_case = ProcessInventoryReservation(
+            inv_repo, outbox_repo, idempotency, order_status
+        )  # type: ignore[arg-type]
 
         await inv_repo.save(
             Inventory(product_id="prod_1", available_quantity=10, reserved_quantity=0)
@@ -29,7 +37,7 @@ class TestProcessInventoryReservation:
 
         await use_case.execute(
             event_id=str(uuid4()),
-            order_id="order-123",
+            order_id=str(uuid4()),
             items=[{"product_id": "prod_1", "quantity": 3}],
         )
 
@@ -47,7 +55,10 @@ class TestProcessInventoryReservation:
         inv_repo = SqlAlchemyInventoryRepository(db_session)
         outbox_repo = SqlAlchemyOutboxRepository(db_session)
         idempotency = ProcessedEventStore(db_session)
-        use_case = ProcessInventoryReservation(inv_repo, outbox_repo, idempotency)
+        order_status = _FakePendingOrderStatus()
+        use_case = ProcessInventoryReservation(
+            inv_repo, outbox_repo, idempotency, order_status
+        )  # type: ignore[arg-type]
 
         await inv_repo.save(
             Inventory(product_id="prod_1", available_quantity=1, reserved_quantity=0)
@@ -55,7 +66,7 @@ class TestProcessInventoryReservation:
 
         await use_case.execute(
             event_id=str(uuid4()),
-            order_id="order-123",
+            order_id=str(uuid4()),
             items=[{"product_id": "prod_1", "quantity": 3}],
         )
 
@@ -73,16 +84,20 @@ class TestProcessInventoryReservation:
         inv_repo = SqlAlchemyInventoryRepository(db_session)
         outbox_repo = SqlAlchemyOutboxRepository(db_session)
         idempotency = ProcessedEventStore(db_session)
-        use_case = ProcessInventoryReservation(inv_repo, outbox_repo, idempotency)
+        order_status = _FakePendingOrderStatus()
+        use_case = ProcessInventoryReservation(
+            inv_repo, outbox_repo, idempotency, order_status
+        )  # type: ignore[arg-type]
 
         await inv_repo.save(
             Inventory(product_id="prod_1", available_quantity=10, reserved_quantity=0)
         )
 
         event_id = str(uuid4())
+        order_id = str(uuid4())
         await use_case.execute(
             event_id=event_id,
-            order_id="order-123",
+            order_id=order_id,
             items=[{"product_id": "prod_1", "quantity": 3}],
         )
         await db_session.commit()
@@ -90,7 +105,7 @@ class TestProcessInventoryReservation:
         # Simulate duplicate delivery
         await use_case.execute(
             event_id=event_id,
-            order_id="order-123",
+            order_id=order_id,
             items=[{"product_id": "prod_1", "quantity": 3}],
         )
         await db_session.commit()

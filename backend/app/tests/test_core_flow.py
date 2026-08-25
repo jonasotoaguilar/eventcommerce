@@ -12,6 +12,7 @@ from app.modules.inventory.infrastructure.sqlalchemy_repository import (
     SqlAlchemyInventoryRepository,
 )
 from app.modules.orders.application.create_order import CreateOrder
+from app.modules.orders.application.get_order_status import GetOrderStatus
 from app.modules.orders.application.process_inventory_result import (
     ProcessOrderInventoryResult,
 )
@@ -48,7 +49,10 @@ class TestCoreFlow:
 
         # Step 2: Process inventory reservation
         inv_event_id = str(uuid4())
-        inv_uc = ProcessInventoryReservation(inv_repo, outbox_repo, idempotency)
+        order_status = GetOrderStatus(order_repo)  # type: ignore[arg-type]
+        inv_uc = ProcessInventoryReservation(
+            inv_repo, outbox_repo, idempotency, order_status
+        )
         await inv_uc.execute(
             event_id=inv_event_id,
             order_id=str(order.id),
@@ -96,7 +100,10 @@ class TestCoreFlow:
         await db_session.commit()
 
         inv_event_id = str(uuid4())
-        inv_uc = ProcessInventoryReservation(inv_repo, outbox_repo, idempotency)
+        order_status = GetOrderStatus(order_repo)  # type: ignore[arg-type]
+        inv_uc = ProcessInventoryReservation(
+            inv_repo, outbox_repo, idempotency, order_status
+        )
         await inv_uc.execute(
             event_id=inv_event_id,
             order_id=str(order.id),
@@ -143,7 +150,10 @@ class TestCoreFlow:
         await db_session.commit()
 
         inv_event_id = str(uuid4())
-        inv_uc = ProcessInventoryReservation(inv_repo, outbox_repo, idempotency)
+        order_status = GetOrderStatus(order_repo)  # type: ignore[arg-type]
+        inv_uc = ProcessInventoryReservation(
+            inv_repo, outbox_repo, idempotency, order_status
+        )
         # Simulate duplicate event processing
         await inv_uc.execute(
             event_id=inv_event_id,
