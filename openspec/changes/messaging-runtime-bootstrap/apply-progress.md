@@ -3,12 +3,12 @@
 ## Work Unit
 
 - Change: `messaging-runtime-bootstrap`
-- Work unit: `messaging-runtime-pr2b-consumer-registry` (task 2.2 only)
-- Scope: PR2b only, task 2.2 `shared/messaging/consumer.py` + test, stacked-to-main on branch `feat/messaging-consumer-registry` clean from `origin/main` `3d25e66` (`feat(messaging): persist publisher messages` merged)
+- Work unit: `messaging-runtime-pr2c-runtime-lifecycle` (tasks 2.3 and 2.4 only)
+- Scope: PR2c only, tasks 2.3 `messaging_runtime.py` + `backend/app/tests/runtime/` + task 2.4 `app.py` lifespan, stacked-to-main on branch `feat/messaging-runtime-lifecycle` from `origin/main` `cbb99e3` (`feat(messaging): add consumer registry` merged)
 - Artifact store: OpenSpec
 - Mode: Strict TDD (`uv run --project backend python -m pytest` from worktree root or `uv run python -m pytest` from backend)
 - Delivery: auto-chain, stacked-to-main; PR2b targets `main` (like PR2a), not branch-to-branch; independently reviewable
-- Review budget: 400 authored changed lines; current delta **400 lines** (167+233) (see PR Boundary) — **within budget, exactly at the 400-line ceiling (inclusive, no size:exception)**
+- Review budget: 400 authored changed lines; current delta **380 lines** (29+166+130+55) authored, **400 complete** (393 add +7 del) (see PR Boundary) — **within budget, no size:exception**
 - Status: success
 - Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, observability-and-instrumentation, security-and-hardening, source-driven-development)
 - Previous apply-progress: `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` (PR2a `messaging-runtime-pr2a-publisher-settings`, 58 lines) and Engram #5248 `sdd/messaging-runtime-bootstrap/apply-progress` (PR1 1.1–1.5)
@@ -28,8 +28,8 @@
 - [x] 1.5 RED→GREEN `outbox_worker.py` + test: publish failure leaves row pending + logs + continues; publish only after confirm.
 - [x] 2.1 RED→GREEN `rabbitmq_publisher.py` + test: PERSISTENT, `message_id`, `event_type`/`aggregate_id` headers; never log payloads.
 - [x] 2.2 RED→GREEN `shared/messaging/consumer.py` + test: registry validation; durable, prefetch 1; unknown/malformed acked; failure nack requeue.
-- [ ] 2.3 RED→GREEN `messaging_runtime.py` + `backend/app/tests/runtime/`: broker-down startup healthy, backoff (cap 30s); shutdown cancels scheduler, closes ≤10s.
-- [ ] 2.4 GREEN `app.py` lifespan: non-fatal connect; start/stop runtime ordering.
+- [x] 2.3 RED→GREEN `messaging_runtime.py` + `backend/app/tests/runtime/`: broker-down startup healthy, backoff (cap 30s); shutdown cancels scheduler, closes ≤10s.
+- [x] 2.4 GREEN `app.py` lifespan: non-fatal connect; start/stop runtime ordering.
 - [x] 2.5 GREEN `settings.py` + `.env.example`: `EVENTCOMMERCE_RABBITMQ_*` vars, poll interval, batch size.
 
 ## PR2a Implementation Summary (preserved)
@@ -113,3 +113,9 @@
 - `backend/app/shared/messaging/rabbitmq_publisher.py` — persistent delivery (PR2a, preserved)
 - `backend/app/shared/config/settings.py` + `backend/.env.example` — RABBITMQ vars + poll/batch (PR2a, preserved)
 - `openspec/changes/messaging-runtime-bootstrap/tasks.md` — marks 2.2 `[x]`, 2.3–2.4 pending
+
+## PR2c — runtime lifecycle (tasks 2.3/2.4)
+
+- Scope: `messaging_runtime.py` (166) + `app.py` lifespan (+29) + `tests/runtime/` (185) from `cbb99e3`
+- Evidence: `uv run --project backend python -m pytest backend/app/tests/runtime -v` → 11 passed (8+3); `cd backend && uv run pyrefly check` → 0 errors; Ruff check/format ok
+- Next: `messaging-runtime-pr3-handlers` (3.1–3.4) then pr4 chain/integration/CI/docs; 3.x/4.x pending
