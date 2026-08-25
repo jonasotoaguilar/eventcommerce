@@ -248,3 +248,47 @@
 - `backend/app/modules/inventory/application/order_status.py` + `get_order_status.py` — PR3a seam
 - `backend/app/shared/messaging/consumer.py` + `test_consumer.py` — PR2b registry
 - `backend/app/shared/messaging/rabbitmq_publisher.py` — PR2a persistent delivery
+
+## PR4a — chain e2e (task 4.1 only, `messaging-runtime-pr4a-chain-e2e`)
+
+- Scope: `backend/app/tests/runtime/test_chain_e2e.py` (344) — fake publisher, actual handlers, order→inventory→terminal; no broker/DB; characterization e2e, not new feature
+- TDD: RED `test_chain_e2e.py` collection `ModuleNotFoundError` before file (characterization, chain already exists after 1.1–3.4); GREEN 4 passed after file; TRIANGULATE happy/rejected/duplicate/terminal/fake-publisher
+- Evidence: `uv run --project backend python -m pytest backend/app/tests/runtime/test_chain_e2e.py -v` → 4 passed in 0.04s
+
+### TDD Cycle Evidence (PR4a)
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.1 | `backend/app/tests/runtime/test_chain_e2e.py` | Unit (broker-free) | `test_consumer`+`test_runtime` 23 passed | ✅ file absent `ModuleNotFoundError` before create | ✅ 4 passed | ✅ happy/rejected/duplicate/terminal/publisher | ➖ none |
+
+### Work Unit Evidence (PR4a — chain only)
+
+| Evidence | Required value | Result |
+|---|---|---|
+| Focused test command | Smallest proving this unit | `uv run --project backend python -m pytest backend/app/tests/runtime/test_chain_e2e.py -v` → **4 passed in 0.04s** (happy, rejected, terminal, duplicate) |
+| Runtime harness | Real integration path or N/A | Fake-publisher transport drives captured outbox events between actual `ProcessInventoryReservation`→`ProcessOrderInventoryResult`→`ProcessOrderNotification` (real `SendOrderNotification`); `_Pub.publish` captures `event_type/aggregate_id/payload/id` without aio-pika/RabbitMQ/Postgres; consumer/publisher/runtime harness 23 passed proves transaction boundary preserved |
+| Rollback boundary | Exact files/behavior | Revert `backend/app/tests/runtime/test_chain_e2e.py` (344) restores no chain proof; handlers/containers/runtime remain; `tasks.md` 4.1 [x] and `apply-progress.md` PR4a are SDD artifacts |
+
+### Validation (post-format, pre-commit, PR4a)
+
+- `uv run --project backend ruff format` → 1 file left unchanged; `ruff check` → All checks passed!
+- `uv run --project backend pyrefly check` → 0 errors (CI-cwd)
+- `uv run --project backend python -m pytest backend/app/tests/runtime/test_chain_e2e.py -v` → 4 passed
+- `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/shared/messaging/test_rabbitmq_publisher.py backend/app/tests/runtime -v` → 23 passed; handler safety 19 passed
+
+### PR Boundary and Line Count (against `origin/main` `0ba9d39`)
+
+- Branch `feat/messaging-chain-e2e` from `0ba9d39` (#71); stacked-to-main, PR4a targets `main`
+- Tracked diff: `git diff 0ba9d39 --stat` → 3 files, ~374 insertions, ~1 deletion → **~375 complete** ≤400 (no size:exception, margin ~25)
+- Staged check: `git diff --cached --numstat` matches complete; no unstaged/untracked after add
+
+### Deviations / Risks / Next
+
+- None for 4.1; uses actual handlers, current contracts, minimal fakes at transport; no payload logging, no compatibility/fallback, no production change
+- Next: `sdd-apply` for 4.2–4.4 (gated integration, CI, docs) — keep each slice ≤400
+
+### Relevant Files (PR4a — this slice)
+
+- `backend/app/tests/runtime/test_chain_e2e.py` — 4 broker-free chain proofs via `_Pub` and real handlers; exact types/ids/payloads/processed keys; duplicate/terminal/publish driving
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 4.1 [x], 4.2–4.4 pending
+- `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — add PR4a evidence, preserve 1.1–3.4
