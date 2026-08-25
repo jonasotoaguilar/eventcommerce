@@ -301,10 +301,9 @@ async def test_terminal_skips_reservation_and_duplicate_prevents_double_reserve(
     )
     assert await h["idem"].is_processed(eid, "ProcessInventoryReservation")
     await h["inv_h"].execute(event_id=eid, order_id=str(oid), items=items)
-    assert (
-        h["outbox"].events == []
-        and (await h["inv"].get_by_product("p1")).available_quantity == 7
-    )  # type: ignore[union-attr]
+    inventory = await h["inv"].get_by_product("p1")
+    assert inventory is not None
+    assert h["outbox"].events == [] and inventory.available_quantity == 7
 
 
 @pytest.mark.asyncio
@@ -316,10 +315,9 @@ async def test_duplicate_delivery_at_each_stage_is_idempotent() -> None:
     ev1 = h["outbox"].events[0]
     await h["inv_h"].execute(event_id=eid1, order_id=str(oid), items=items)
     await h["inv_h"].execute(event_id=eid1, order_id=str(oid), items=items)
-    assert (
-        len(h["outbox"].events) == 1
-        and (await h["inv"].get_by_product("p1")).available_quantity == 8
-    )  # type: ignore[union-attr]
+    inventory = await h["inv"].get_by_product("p1")
+    assert inventory is not None
+    assert len(h["outbox"].events) == 1 and inventory.available_quantity == 8
     await h["ord_h"].execute(event_id=str(ev1.id), order_id=oid, result="reserved")
     ev2 = h["outbox"].events[1]
     await h["ord_h"].execute(event_id=str(ev1.id), order_id=oid, result="reserved")
