@@ -3,15 +3,15 @@
 ## Work Unit
 
 - Change: `messaging-runtime-bootstrap`
-- Work unit: `messaging-runtime-pr3d-container-wiring` (task 3.4 only)
-- Scope: PR3d only, containers + `messaging_runtime.py` + `test_container_wiring.py`, stacked-to-main on branch `feat/messaging-runtime-wiring` from `origin/main` `75a1125` (#70 merged)
+- Work unit: `messaging-runtime-pr4b-rabbitmq-ci` (tasks 4.2+4.3)
+- Scope: PR4b only, gated RabbitMQ integration + CI rabbitmq service (stacked-to-main on branch `feat/messaging-rabbitmq-ci` from `origin/main` `5a95149` (#71 merged))
 - Artifact store: OpenSpec
 - Mode: Strict TDD (`uv run --project backend python -m pytest`)
 - Delivery: auto-chain, stacked-to-main; each PR targets `main` independently
 - Review budget: 400 complete changed lines; no size:exception
 - Status: success
-- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, design-patterns, review-reliability, security-and-hardening)
-- Previous apply-progress: PR3c `notification-handler` on `75a1125`; PR3b `orders-guard` on `a1db18e`; PR3a `inventory-guard` on `2e2bfd7`; PR2c `cbb99e3`; PR2b `3d25e66`; PR1 1.1–1.5
+- Skill Resolution: paths-injected (sdd-apply, strict-tdd, work-unit-commits, ci-cd-and-automation, security-and-hardening)
+- Previous apply-progress: PR4a `chain-e2e` on `5a95149`; PR3d `wiring` on `75a1125`; PR3c/b/a, PR2c/b/a, PR1 1.1–1.5
 
 ## Phase Envelope
 
@@ -34,6 +34,10 @@
 - [x] 3.2 RED→GREEN guard `process_inventory_result.py` + test: late result on confirmed/cancelled no-ops, skip recorded.
 - [x] 3.3 RED→GREEN `notifications/application/process_order_notification.py` + test: notifies once; duplicate no-op; processed row same transaction.
 - [x] 3.4 GREEN wire containers (orders/inventory/notifications); composition supplies `GetOrderStatus`.
+- [x] 4.1 RED→GREEN chain e2e `test_chain_e2e.py` (runtime/): fake publisher, order→inventory→terminal; no broker in default suite.
+- [x] 4.2 GREEN gated integration test `test_rabbitmq_integration.py` (integration/, skip unless env set): restart persistence, topology recovery, EXPLAIN evidence.
+- [x] 4.3 GREEN `.github/workflows/api-ci.yml`: rabbitmq service, gated env, integration job.
+- [ ] 4.4 GREEN docs (after 2.4): `ARCHITECTURE.md` matrix `implemented` + evidence; GLOSSARY wiring; ADR 0002 delivered; README snapshot; no premature AMQP claims.
 
 ## PR2a Implementation Summary (preserved)
 
@@ -292,3 +296,61 @@
 - `backend/app/tests/runtime/test_chain_e2e.py` — 4 broker-free chain proofs via `_Pub` and real handlers; exact types/ids/payloads/processed keys; duplicate/terminal/publish driving
 - `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 4.1 [x], 4.2–4.4 pending
 - `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — add PR4a evidence, preserve 1.1–3.4
+
+## PR4b — gated RabbitMQ integration + CI (tasks 4.2+4.3, `messaging-runtime-pr4b-rabbitmq-ci`)
+
+- Scope: `backend/app/tests/integration/test_rabbitmq_integration.py` (159, `__init__.py` 0) — gated **only** `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1`, real `aio-pika` `RabbitMQPublisher` + durable `order.events` queue, `DeliveryMode.PERSISTENT`, restart/reconnect, durable re-bind, deterministic `EXPLAIN` `(status, created_at)` with 60-row volume + `ANALYZE`; `.github/workflows/api-ci.yml` (+20) — rabbitmq service `rabbitmq:3-management-alpine` `rabbitmq-diagnostics ping`, gated env `1` + `RABBITMQ_*`; no second pipeline, postgres preserved. When enabled, DB/broker/setup/assertions **fail** (not skip) so CI cannot be green without real scenario.
+- TDD: RED file not found `ERROR: file or directory not found` before create; GREEN `1 skipped` when gated off (0.03s), `1 failed OperationalError` when gated on with no local DB/broker (expected, proves no skip mask), `0 errors` pyrefly; TRIANGULATE persistent + durable + deterministic EXPLAIN (60 rows, ANALYZE, Index Scan) in one gated test; REFACTOR `Base.metadata.create_all` + `CREATE INDEX IF NOT EXISTS` + `ANALYZE`, `str()` casts, `type: ignore` minimal, deterministic `NOW()+(idx||' seconds')::interval`.
+
+### TDD Cycle Evidence (PR4b)
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 4.2 | `backend/app/tests/integration/test_rabbitmq_integration.py` | Integration (real broker/DB) | `backend/app/tests/runtime/test_chain_e2e.py` 4 passed, `test_consumer` 5 passed | ✅ `ERROR: file or directory not found` before create | ✅ `1 skipped` gated off (0.03s); `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` → **1 failed** `OperationalError connection refused` (0.30s, expected locally without DB/broker, **not a skip** — proves gate is sole skip) | ✅ persistent (PERSISTENT+message_id/headers/payload), durable (re-declare+re-bind+delete), deterministic EXPLAIN (60 rows, ANALYZE, Index Scan ix_outbox_events_status_created_at, no Seq Scan) in one test | ✅ `Base.metadata.create_all` + `ANALYZE` + idempotent index, deterministic interval, typed casts |
+| 4.3 | `.github/workflows/api-ci.yml` | CI | Valid YAML `yaml.safe_load` ok, `postgres` healthy | N/A — GREEN per tasks.md (structural) | ✅ rabbitmq service + health + gated env, `postgres` preserved, `checkout@v7`/`setup-python@v7`/`setup-uv@v7` pinned | ➖ Single | ➖ minimal block |
+
+### Work Unit Evidence (PR4b — integration + CI only)
+
+| Evidence | Required value | Result |
+|---|---|---|
+| Focused test command and exact result | Smallest command proving this unit; command, exit/result, and relevant counts | `uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py -v` → **1 skipped in 0.03s** (gated off, `gated: set EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1`); `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1 uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py -v` → **1 failed in 0.30s** `OperationalError connection refused` (expected locally without DB/broker, **not skipped** — honest unavailable proof, CI with services will make it pass); `uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py backend/app/tests/runtime/test_chain_e2e.py backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/shared/messaging/test_rabbitmq_publisher.py -v` (gated off) → **13 passed, 1 skipped in 0.10s** |
+| Runtime harness command/scenario and exact result | Real integration/runtime path; explicit `N/A` only when no runtime boundary exists, with reason | Real broker/DB harness (no mocks, aio-pika 10.0.1): `RabbitMQPublisher` publishes `PERSISTENT` + `message_id` + `headers` via `exchange.publish`; `MessageConsumer` path via `declare_exchange(durable=True)`, `declare_queue(durable=True)`, `set_qos(1)`, `bind`. Test declares `integration.test.persistent.<8hex>` durable, `purge`, publishes via production `RabbitMQPublisher`, `close`, `sleep 0.2`, `connect_robust` re-establish, re-declare+re-bind (topology recovery), `q2.get` asserts `PERSISTENT`/`message_id`/headers/`payload`→`ack`→`delete`. DB: `create_async_engine(test_database_url)`, `run_sync(Base.metadata.create_all)`, `CREATE INDEX IF NOT EXISTS`, **60 rows** `INSERT ... NOW()+(idx||' seconds')::interval` (30 pending/30 published, distinct `created_at`), `ANALYZE outbox_events`, `EXPLAIN SELECT ... WHERE status='pending' ORDER BY created_at LIMIT 100` → asserts `ix_outbox_events_status_created_at` + `Index Scan`/`Index Only Scan` not `Seq Scan` (deterministic, not masked; assertions propagate). Locally `docker ps` empty + `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` → **1 failed** (expected, proves CI must provide DB/broker); gated off → `1 skipped`. CI adds `rabbitmq:3-management-alpine` `rabbitmq-diagnostics ping` + `postgres:16-alpine` + `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` to make it pass. Broker-free regressions: `uv run --project backend python -m pytest backend/app/tests/runtime -v` → 11 passed (gated off). |
+| Rollback boundary | Exact files/behavior that can be reverted without removing unrelated work | Revert `backend/app/tests/integration/test_rabbitmq_integration.py` (159) + `__init__.py` (0) and `.github/workflows/api-ci.yml` (+20 service +6 env). Restores no gated test and CI without rabbitmq; `messaging_runtime`/`consumer`/`publisher`/`outbox_*`/`migration`/`test_chain_e2e` remain. `tasks.md` 4.2/4.3 `[x]` and `apply-progress.md` PR4b are SDD artifacts. |
+
+### Validation (post-format, pre-commit, PR4b — corrected)
+
+- `uv run --project backend ruff format backend/app/tests/integration/test_rabbitmq_integration.py` → `1 file left unchanged`; `ruff check` → `All checks passed!`; `ruff format --check` → already formatted
+- `uv run --project backend ruff check .` (worktree) → `All checks passed!`; `uv run --project backend pyrefly check` (worktree) → `0 errors`; `uv run pyrefly check` (backend) → `0 errors`
+- **Disabled gate** `uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py -v` → **1 skipped** `gated: set EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` (0.03s)
+- **Enabled local (expected failure, not skip)** `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1 uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py -v` → **1 failed** `OperationalError connection refused` (0.30s) — **honest unavailable proof**, does NOT claim a passing real run; proves gate is sole skip and CI cannot be green without DB/broker
+- Broker-free `uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py backend/app/tests/runtime/test_chain_e2e.py backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/shared/messaging/test_rabbitmq_publisher.py -v` (gated off) → **13 passed, 1 skipped in 0.10s**; `backend/app/tests/runtime -v` → 11 passed; `shared/messaging -v` → 9 passed (5 consumer+4 publisher) with `connection refused` honestly for other DB suites
+- Workflow syntax `python -c "import yaml; yaml.safe_load(open('.github/workflows/api-ci.yml'))"` → ok; actions `checkout@v7`/`setup-python@v7`/`setup-uv@v7` pinned, cache `backend/pyproject.toml`, no secrets cached
+
+### PR Boundary and Line Count (against `origin/main` `5a95149` — corrected)
+
+- Branch `feat/messaging-rabbitmq-ci` from `origin/main` `5a95149`
+- Tracked diff `git diff origin/main --stat` → 5 files; `git diff origin/main --numstat` → `20 0 .github/workflows/api-ci.yml`, `159 0 backend/app/tests/integration/test_rabbitmq_integration.py`, `0 0 backend/app/tests/integration/__init__.py`, `2 2 openspec/changes/messaging-runtime-bootstrap/tasks.md`, `66 4 openspec/changes/messaging-runtime-bootstrap/apply-progress.md` → **247 insertions +6 deletions =253 complete** ≤400 (no size:exception, margin ~147, target ≤360 met)
+- `git diff --cached --numstat` == `git diff origin/main --numstat`, `git status` staged 5, no untracked, `git diff --stat HEAD` 0 unstaged; complete == cached true
+- Chain: stacked-to-main — PR4b targets `main` after PR4a merges; diff shows only PR4b work unit; no prior PR leak
+
+### Deviations from Design
+
+- None for 4.2/4.3; real `aio-pika` 10.0.1 `RabbitMQPublisher` + durable `order.events` + `Base.metadata.create_all` + deterministic 60-row `ANALYZE` + `EXPLAIN` per `design.md` Persistent/Durable/Gated; CI extends existing `api-ci.yml` with health+gated env; no backward-compat, no production abstraction, no payload log, credentials via `EVENTCOMMERCE_RABBITMQ_*` env
+
+### Risks
+
+- **Local Docker unavailable**: `docker ps` empty, gated off → 1 skipped, gated on → **1 failed** `OperationalError` (expected, **not a skip** — honestly reports unavailable proof, not a passing claim); CI must provide `rabbitmq`+`postgres` services to make it pass
+- **Budget**: 253/400 inclusive (159 test+20 CI+68 apply-progress net+4 tasks), margin preserved; one gated file with one async test covering three evidences
+
+### Next Steps
+
+- Next: `sdd-apply` for 4.4 docs (`ARCHITECTURE.md` matrix `implemented` + evidence, GLOSSARY, ADR 0002, README) targeting `main` after PR4b merges; keep ≤400
+- Do not touch 4.4 until PR4b merges
+
+### Relevant Files (PR4b — this slice)
+
+- `backend/app/tests/integration/test_rabbitmq_integration.py` — gated real-broker: `PERSISTENT`, durable queue/exchange, restart/reconnect, re-bind, `ack`/`delete`, deterministic `EXPLAIN` 60 rows + `ANALYZE` (159, RED→GREEN, gate sole skip)
+- `backend/app/tests/integration/__init__.py` — package marker (0)
+- `.github/workflows/api-ci.yml` — extend pipeline: `rabbitmq:3-management-alpine` `rabbitmq-diagnostics ping`, `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` + `RABBITMQ_*`, preserve `postgres:16-alpine` (GREEN, +20)
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 4.2 `[x]`, 4.3 `[x]`, 4.4 pending
+- `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — add PR4b evidence, preserve 1.1–4.1+PR4a
