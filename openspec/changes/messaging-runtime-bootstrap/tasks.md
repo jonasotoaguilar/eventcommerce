@@ -40,7 +40,7 @@ auto-chain; chain strategy resolved by user: stacked-to-main — PR 1 → PR 4 e
 
 - [x] 3.1 RED→GREEN `inventory/application/order_status.py` (`OrderStatusQuery`) + `get_order_status.py` + guard in `process_inventory_reservation.py` + test: terminal skip; duplicate once; no sync-checkout double reserve.
 - [x] 3.2 RED→GREEN guard `process_inventory_result.py` + test: late result on confirmed/cancelled no-ops, skip recorded.
-- [ ] 3.3 RED→GREEN `notifications/application/process_order_notification.py` + test: notifies once; duplicate no-op; processed row same transaction.
+- [x] 3.3 RED→GREEN `notifications/application/process_order_notification.py` + test: notifies once; duplicate no-op; processed row same transaction.
 - [ ] 3.4 GREEN wire containers (orders/inventory/notifications); composition supplies `GetOrderStatus`.
 
 ## Phase 4: Chain, integration, CI, docs

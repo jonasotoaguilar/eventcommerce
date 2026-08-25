@@ -3,15 +3,15 @@
 ## Work Unit
 
 - Change: `messaging-runtime-bootstrap`
-- Work unit: `messaging-runtime-pr3b-orders-terminal-guard` (task 3.2 only)
-- Scope: PR3b only, guard `process_inventory_result.py` + `test_order_result_terminal_guard.py`, stacked-to-main on branch `feat/messaging-order-result-guard` from `origin/main` `2e2bfd7` (PR #68 merged)
+- Work unit: `messaging-runtime-pr3c-notification-handler` (task 3.3 only)
+- Scope: PR3c only, `process_order_notification.py` + `test_process_order_notification.py`, stacked-to-main on branch `feat/messaging-order-notifications` from `origin/main` `a1db18e` (#69 merged)
 - Artifact store: OpenSpec
 - Mode: Strict TDD (`uv run --project backend python -m pytest`)
 - Delivery: auto-chain, stacked-to-main; each PR targets `main` independently
 - Review budget: 400 complete changed lines; no size:exception
 - Status: success
-- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, code-simplification, review-reliability)
-- Previous apply-progress: PR3a `inventory-terminal-guard` on `2e2bfd7`; PR2c `cbb99e3`; PR2b `3d25e66`; PR1 1.1–1.5
+- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, code-simplification, review-reliability, security-and-hardening)
+- Previous apply-progress: PR3b `orders-terminal-guard` on `a1db18e`; PR3a `inventory-terminal-guard` on `2e2bfd7`; PR2c `cbb99e3`; PR2b `3d25e66`; PR1 1.1–1.5
 
 ## Phase Envelope
 
@@ -32,6 +32,7 @@
 - [x] 2.5 GREEN `settings.py` + `.env.example`: `EVENTCOMMERCE_RABBITMQ_*` vars, poll interval, batch size.
 - [x] 3.1 RED→GREEN `inventory/application/order_status.py` (`OrderStatusQuery`) + `get_order_status.py` + guard in `process_inventory_reservation.py` + test: terminal skip; duplicate once; no sync-checkout double reserve.
 - [x] 3.2 RED→GREEN guard `process_inventory_result.py` + test: late result on confirmed/cancelled no-ops, skip recorded.
+- [x] 3.3 RED→GREEN `notifications/application/process_order_notification.py` + test: notifies once; duplicate no-op; processed row same transaction.
 
 ## PR2a Implementation Summary (preserved)
 
@@ -61,6 +62,7 @@
 | 2.5 | `backend/app/shared/config/settings.py` + `backend/.env.example` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/config/test_settings.py` → 4 passed in 0.01s | N/A — GREEN per tasks.md | Added `Field(alias=...)` poll/batch and verified via `Settings()` env override → 4 passed + manual check | N/A — single field defaults, no branching | N/A |
 | 3.1 | `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` + `inventory/application/order_status.py` + `orders/application/get_order_status.py` + `process_inventory_reservation.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py -v` → 5 passed; `backend/app/tests/runtime -v` → 11 passed (safety net) | `ModuleNotFoundError: No module named 'app.modules.inventory.application.order_status'` (RED: test imports protocol before file exists) | Created `order_status.py` (`@runtime_checkable` Protocol `get_status(UUID)->str|None`) + `get_order_status.py` (`GetOrderStatus` implements Protocol via `OrderRepository.get_by_id`, only `get_status`) + guard in `process_inventory_reservation.py` (`order_status: OrderStatusQuery` required, idempotency first, then `UUID(str(order_id))` → `get_status` → if `confirmed`/`cancelled` → `mark_processed` same consumer/event and return; pending/missing → preserve reservation; malformed UUID raises to consumer nack; duplicate via `is_processed` first) → `uv run --project backend python -m pytest ...test_inventory_terminal_guard.py -v` → 6 passed in 0.03s | Triangulate: `test_get_order_status_returns_status` checks confirmed/cancelled/None (no `execute` alias); `test_terminal_confirmed_skips` (counts, processed, duplicate no-ops) + `test_terminal_cancelled_skips` (second terminal variant); `test_duplicate_reserves_once` (pending duplicate once); `test_sync_checkout_double_reserve_prevented` (confirmed checkout 7/3 unchanged); `test_pending_and_missing_reserve` (pending/None reserves + malformed `order-123` raises `ValueError`, no reservation, no status call) | No new abstraction; guard minimal, no payload logging, required constructor injection — no 3-arg compatibility, no invalid-UUID fallback |
 | 3.2 | `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` + `process_inventory_result.py` guard | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed (safety net); DB `test_process_inventory_result.py` 3 errors `connection refused` honestly reported | `test_terminal_confirmed_late_reserved` → 1 == 0 `save_calls` failed; `test_terminal_skip_regardless` → `InvalidStateTransitionError: Cannot cancel order from status confirmed` — 3 failed, 2 passed proves RED before fix | Added `if order.status in ("confirmed","cancelled"): await mark_processed(event_id,"ProcessOrderInventoryResult"); return` after `is_processed`+`order-not-found` → `5 passed in 0.02s` | Triangulate: `test_terminal_cancelled_late_rejected` second terminal; `test_terminal_skip_regardless_of_result_value` proves `confirmed+rejected` and `cancelled+reserved` both no-op regardless of value (would raise without guard); `test_pending_reserved_confirms_and_pending_rejected_cancels` preserves pending→confirmed/cancelled + duplicate-once | No new abstraction; interface unchanged, no logging of payload/body/credentials, no OrderStatusQuery added |
+| 3.3 | `backend/app/tests/modules/notifications/application/test_process_order_notification.py` + `notifications/application/process_order_notification.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed (safety net); `test_process_inventory_result` 3 errors `connection refused` honestly reported | `ModuleNotFoundError: No module named 'app.modules.notifications.application.process_order_notification'` — RED proven (test imports handler before file exists; 1 error during collection) | Created `process_order_notification.py` (41 lines, `ProcessOrderNotification(notifier, idempotency)` mandatory, no defaults; `is_processed` first → `UUID(str(aggregate_id))` → event_type `OrderConfirmed`/`OrderCancelled` → channel `email` + deterministic content → `await notifier.execute` → `await mark_processed` same transaction; malformed raises `ValueError`, unknown raises `ValueError`, failure not marked) → `uv run --project backend python -m pytest ...test_process_order_notification.py -v` → **8 passed in 0.03s** (confirmed, cancelled, duplicate, duplicate-skip-without-revalidate, failure-not-marked, malformed, unknown, mandatory-deps) | Triangulate: `test_cancelled` second type, `test_duplicate_skips_without_revalidating` proves duplicate returns before UUID/event-type validation (malformed+unknown no-op), `test_notification_failure_not_marked` proves rollback boundary, `test_malformed`/`test_unknown` prove no notification and no mark; all use DB/broker-free fakes; consumer/runtime harness still 16 passed | No new abstraction; handler minimal, no payload logging, no outbox, no container wiring |
 
 ## Work Unit Evidence (PR2b — consumer registry only)
 
@@ -158,6 +160,14 @@
 | Runtime harness command/scenario and exact result | Real integration/runtime path; explicit `N/A` only when no runtime boundary exists, with reason | Broker/DB-free fake-unit harness: `ProcessOrderInventoryResult(FakeOrderRepository, FakeEventRepository, FakeOutbox, FakeIdempotency)` with `Order(status=confirmed/cancelled/pending)` exercises terminal skip inside same consumer transaction; confirms no `save`/`add`/`outbox`, `mark_processed` recorded, duplicate is_processed no-op, pending transitions commit. Consumer/runtime harness preserved: `MessageConsumer` durable TOPIC + prefetch 1 + ack/nack via `test_consumer.py` 16 passed proves per-message transaction boundary still holds. DB `test_process_inventory_result.py` collected → 3 errors `psycopg.OperationalError connection refused` honestly reported — no local postgres, not fabricated. |
 | Rollback boundary | Exact files/behavior that can be reverted without removing unrelated work | Revert `backend/app/modules/orders/application/process_inventory_result.py` (remove 6-line terminal guard) and `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` (219 lines). Reverting restores late results re-transitioning or raising; `test_inventory_terminal_guard.py`/consumer/runtime/tasks remain untouched. |
 
+## Work Unit Evidence (PR3c — notification handler only)
+
+| Evidence | Required value | Result |
+|---|---|---|
+| Focused test command and exact result | Smallest command proving this unit; command, exit/result, and relevant counts | `uv run --project backend python -m pytest backend/app/tests/modules/notifications/application/test_process_order_notification.py -v` → **8 passed in 0.03s** (confirmed, cancelled, duplicate once, duplicate-skip-without-revalidate, failure-not-marked, malformed, unknown, mandatory-deps) |
+| Runtime harness command/scenario and exact result | Real integration/runtime path; explicit `N/A` only when no runtime boundary exists, with reason | DB/broker-free fake harness: `ProcessOrderNotification(FakeNotifier, FakeIdempotency)` proves idempotent `OrderConfirmed`/`OrderCancelled` → `SendOrderNotification(email, deterministic content)` → `mark_processed` same consumer transaction; failure not marked, malformed/unknown no notification, duplicate once. Consumer/runtime harness preserved: `MessageConsumer` durable TOPIC + prefetch 1 + ack/nack via `test_consumer.py` + `test_messaging_runtime.py` → **16 passed** proves per-message transaction boundary still holds. DB `test_sqlalchemy_repository` 3 errors `connection refused` honestly reported — no postgres, not fabricated. |
+| Rollback boundary | Exact files/behavior that can be reverted without removing unrelated work | Revert `backend/app/modules/notifications/application/process_order_notification.py` (41) and `backend/app/tests/modules/notifications/application/test_process_order_notification.py` (167) restores no notification handler; `process_inventory_result.py`/ `inventory_terminal_guard` / consumer/runtime/tasks remain untouched. |
+
 ## Validation (post-format, pre-commit, PR3b)
 
 - `uv run --project backend ruff format backend/app/modules/orders/application/process_inventory_result.py backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` → `2 files left unchanged`
@@ -169,29 +179,48 @@
 - `uv run --project backend python -m pytest backend/app/tests/modules/orders/domain -v` → 16 passed; `backend/app/tests/modules/orders/application/test_process_inventory_result.py` → 3 errors `connection refused` honestly reported
 - `uv run --project backend ruff format --check` → already formatted; 3.2 only, 3.3-3.4/4.x pending
 
-## PR Boundary and Line Count (against `origin/main` `2e2bfd7`)
+## Validation (post-format, pre-commit, PR3c)
 
-- Branch: `feat/messaging-order-result-guard` from `origin/main` `2e2bfd7` (`feat(messaging): guard inventory reservations` #68 merged)
-- Tracked diff: `git diff 2e2bfd7 --stat` → 4 files, ~230 insertions (+6 process_inventory_result +219 guard test +1 tasks +~60 apply-progress), 0 deletions beyond task mark; complete `git diff origin/main --numstat` additions+deletions ≤400 (no size:exception, margin ~100)
-- Checkpoints: before edit `git diff --stat HEAD` 0 clean; after guard+test `git diff origin/main --numstat` ~225; after tasks+apply-progress ≤350; staged vs unstaged identical
-- Chain guidance: `stacked-to-main` — PR3b targets `main` after PR3a merges; no branch-to-branch; diff shows only PR3b work unit
+- `uv run --project backend ruff format backend/app/modules/notifications/application/process_order_notification.py backend/app/tests/modules/notifications/application/test_process_order_notification.py` → `2 files left unchanged`
+- `uv run --project backend ruff check backend/app/modules/notifications/application/process_order_notification.py backend/app/tests/modules/notifications/application/test_process_order_notification.py` → `All checks passed!`
+- `uv run --project backend pyrefly check` (via `cd backend`) → `0 errors`
+- `uv run --project backend python -m pytest backend/app/tests/modules/notifications/application/test_process_order_notification.py -v` → 8 passed in 0.03s
+- `uv run --project backend python -m pytest backend/app/tests/modules/notifications/application/test_process_order_notification.py backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 24 passed (8 notif +5 consumer +11 runtime)
+- `uv run --project backend python -m pytest backend/app/tests/modules/notifications -v` → 17 passed, 3 errors `connection refused` honestly reported (DB-less harness proves handler; Postgres not available locally)
+- `uv run --project backend ruff format --check` → already formatted; 3.3 done, 3.4/4.x pending
+
+## PR Boundary and Line Count (against `origin/main` `a1db18e`)
+
+- Branch: `feat/messaging-order-notifications` from `origin/main` `a1db18e` (`feat(messaging): guard order result transitions` #69 merged)
+- Tracked diff: `git diff a1db18e --stat` → 4 files, 256 insertions, 19 deletions (+41/0 process_order_notification +167/0 test +47/18 apply-progress +1/1 tasks); complete `git diff a1db18e --numstat` → **256 insertions, 19 deletions** → **275 complete** ≤400 (no size:exception, margin ~125)
+- Checkpoints: before edit `git diff --stat HEAD` 0 clean; after handler+test `git diff a1db18e --numstat` 208/0; after tasks+apply-progress 256/19=275; staged vs unstaged identical after `git add` of 4 paths
+- Chain guidance: `stacked-to-main` — PR3c targets `main` after PR3b merges; diff shows only PR3c work unit (verify via `git diff a1db18e --stat` shows only the 4 files); PR3b history preserved in apply-progress
 
 ## Deviations from Design
 
-- None for task 3.2; guard implements exactly `design.md` terminal check via already-loaded `order.status`, `mark_processed` same `processed_events` row, no extra query or container wiring.
+- None for task 3.3; `ProcessOrderNotification` implements exactly `design.md` delegation to `SendOrderNotification` and same-transaction `mark_processed` with mandatory injection, `is_processed` first, `UUID(str(aggregate_id))` (malformed raises), `OrderConfirmed`/`OrderCancelled` → `email` + deterministic English content, `ValueError` on unknown type, no outbox/payload-log/container wiring. Previous tasks 3.1-3.2 also no deviation.
 
 ## Risks
 
-- PostgreSQL unavailable locally — DB integration tests honestly `connection refused`, not a regression; fake-unit harness proves guard.
-- Budget: complete diff ≤400 inclusive, margin preserved; no `size:exception` needed.
+- PostgreSQL unavailable locally — DB integration tests honestly `connection refused` (3 errors for `test_sqlalchemy_repository`, 3 for `test_process_inventory_result`) — not a regression; fake-unit harness proves handler idempotency and same-transaction boundary. Consumer/runtime harness 16 passed proves ack/nack boundary preserved.
+- Budget: complete diff 275/400 inclusive, margin preserved; no `size:exception` needed. Handler 41/0 + test 167/0 + tasks 1/1 + apply-progress 47/18 → 256 ins, 19 del → 275 complete.
 
 ## Next Steps
 
-- Next recommended: `sdd-apply` for `messaging-runtime-pr3c-orders-notification` tasks 3.3–3.4, then pr4 chain/integration/CI/docs; keep each PR ≤400 stacked-to-main
-- Do not start 4.x until 3.3-3.4 merge
+- Next recommended: `sdd-apply` for `messaging-runtime-pr3c-notification-handler` task 3.4 (container wiring supplying `GetOrderStatus` and binding notifications handler), then pr4 chain/integration/CI/docs; keep each PR ≤400 stacked-to-main
+- Do not start 4.x until 3.4 merges
 
-## Relevant Files (PR3b)
+## Relevant Files (PR3c — this slice)
 
-- `backend/app/modules/orders/application/process_inventory_result.py` — terminal guard after is_processed+not-found, `confirmed/cancelled` → `mark_processed` and return, no save/event/outbox (RED→GREEN)
-- `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` — 5 unit tests: terminal confirmed/cancelled skip + processed + duplicate, regardless-value skip (would raise without guard), pending both paths + duplicate once, not-found raises (RED→GREEN→TRIANGULATE)
-- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.2 `[x]`, 3.3-3.4/4.x pending
+- `backend/app/modules/notifications/application/process_order_notification.py` — idempotent handler for `OrderConfirmed`/`OrderCancelled`, mandatory `SendOrderNotification`+`ProcessedEventStore`, `is_processed` first → `UUID` parse → deterministic `email`+content → `notifier.execute` → `mark_processed` same consumer transaction (RED→GREEN)
+- `backend/app/tests/modules/notifications/application/test_process_order_notification.py` — 8 unit tests: confirmed/cancelled notify + content, duplicate once, duplicate-skip-without-revalidate, failure-not-marked, malformed UUID, unknown type, mandatory deps (RED→GREEN→TRIANGULATE)
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.3 `[x]`, 3.4 and 4.x pending
+- `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — cumulative: 1.1-3.3 complete, 3.4/4.x pending
+
+## Relevant Files (history preserved)
+
+- `backend/app/modules/orders/application/process_inventory_result.py` — PR3b terminal guard (6 lines)
+- `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` — PR3b 5 tests (219)
+- `backend/app/modules/inventory/application/order_status.py` + `get_order_status.py` + `process_inventory_reservation.py` — PR3a guard + seam
+- `backend/app/shared/messaging/consumer.py` + `test_consumer.py` — PR2b registry (400)
+- `backend/app/shared/messaging/rabbitmq_publisher.py` — PR2a persistent delivery
