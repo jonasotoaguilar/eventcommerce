@@ -8,6 +8,7 @@ from app.modules.orders.application.confirm_order import ConfirmOrder
 from app.modules.orders.application.create_order import CreateOrder
 from app.modules.orders.application.get_order import GetOrder
 from app.modules.orders.application.get_order_timeline import GetOrderTimeline
+from app.modules.orders.application.get_order_status import GetOrderStatus
 from app.modules.orders.application.process_inventory_result import (
     ProcessOrderInventoryResult,
 )
@@ -39,6 +40,11 @@ class OrdersContainer(containers.DeclarativeContainer):
     get_order_timeline = providers.Factory(GetOrderTimeline, event_repo=event_repo)
     confirm_order = providers.Factory(ConfirmOrder, repository=order_repo)
     cancel_order = providers.Factory(CancelOrder, repository=order_repo)
+    get_order_status = providers.Factory(
+        GetOrderStatus,
+        order_repository=order_repo,
+    )
+
     process_order_inventory_result = providers.Factory(
         ProcessOrderInventoryResult,
         order_repo=order_repo,

@@ -2,6 +2,9 @@ import asyncio
 import logging
 import random
 from collections.abc import Awaitable, Callable
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 _CAP = 30.0
@@ -15,6 +18,103 @@ def _jittered_backoff(
     jitter: Callable[[float, float], float] = random.uniform,
 ) -> float:
     return jitter(0, min(cap, base * (2**attempt)))
+
+
+def _inventory_handler_factory(session: AsyncSession):  # type: ignore[no-untyped-def]
+    from app.modules.inventory.api.container import InventoryContainer
+    from app.modules.orders.api.container import OrdersContainer
+
+    orders_c = OrdersContainer()
+    inventory_c = InventoryContainer()
+    orders_c.session.override(session)
+    inventory_c.session.override(session)
+    get_status = orders_c.get_order_status()
+    inventory_c.order_status_query.override(get_status)
+    handler = inventory_c.process_inventory_reservation()
+
+    async def _handle(  # type: ignore[no-untyped-def]
+        *, payload: dict, event_id: str, event_type: str, aggregate_id: str
+    ) -> None:
+        if event_type != "OrderCreated":
+            raise ValueError(f"unsupported event_type: {event_type}")
+        UUID(str(aggregate_id))
+        UUID(str(event_id))
+        items = payload["items"]
+        if not isinstance(items, list):
+            raise ValueError("items must be list")
+        await handler.execute(event_id=event_id, order_id=aggregate_id, items=items)
+
+    return _handle
+
+
+def _orders_handler_factory(session: AsyncSession):  # type: ignore[no-untyped-def]
+    from app.modules.orders.api.container import OrdersContainer
+
+    orders_c = OrdersContainer()
+    orders_c.session.override(session)
+    handler = orders_c.process_order_inventory_result()
+
+    async def _handle(  # type: ignore[no-untyped-def]
+        *, payload: dict, event_id: str, event_type: str, aggregate_id: str
+    ) -> None:
+        if event_type == "InventoryReserved":
+            result = "reserved"
+        elif event_type == "InventoryRejected":
+            result = "rejected"
+        else:
+            raise ValueError(f"unsupported event_type: {event_type}")
+        order_id = UUID(str(aggregate_id))
+        UUID(str(event_id))
+        _ = payload  # payload not used beyond validation, keep exact contract
+        await handler.execute(event_id=event_id, order_id=order_id, result=result)
+
+    return _handle
+
+
+def _notifications_handler_factory(session: AsyncSession):  # type: ignore[no-untyped-def]
+    from app.modules.notifications.api.container import NotificationsContainer
+
+    notifications_c = NotificationsContainer()
+    notifications_c.session.override(session)
+    handler = notifications_c.process_order_notification()
+
+    async def _handle(  # type: ignore[no-untyped-def]
+        *, payload: dict, event_id: str, event_type: str, aggregate_id: str
+    ) -> None:
+        await handler.execute(
+            payload=payload,
+            event_id=event_id,
+            event_type=event_type,
+            aggregate_id=aggregate_id,
+        )
+
+    return _handle
+
+
+def _create_wired_consumer(session_factory, settings):  # type: ignore[no-untyped-def]
+    from app.shared.messaging.consumer import ConsumerBinding, MessageConsumer
+
+    bindings = [
+        ConsumerBinding(
+            queue="inventory.order_created",
+            event_types=("OrderCreated",),
+            consumer_name="ProcessInventoryReservation",
+            handler_factory=_inventory_handler_factory,
+        ),
+        ConsumerBinding(
+            queue="orders.inventory_result",
+            event_types=("InventoryReserved", "InventoryRejected"),
+            consumer_name="ProcessOrderInventoryResult",
+            handler_factory=_orders_handler_factory,
+        ),
+        ConsumerBinding(
+            queue="notifications.order_terminal",
+            event_types=("OrderConfirmed", "OrderCancelled"),
+            consumer_name="ProcessOrderNotification",
+            handler_factory=_notifications_handler_factory,
+        ),
+    ]
+    return MessageConsumer(settings.rabbitmq_url, bindings, session_factory)
 
 
 class MessagingRuntime:
@@ -158,9 +258,19 @@ def create_messaging_runtime(
 
         pub = publisher or RabbitMQPublisher(settings.rabbitmq_url)
         worker = OutboxWorker(session_factory, pub)
-        return MessagingRuntime(
-            pub, consumer, worker, poll, batch, sleep=sleep, jitter=jitter
+        cons = (
+            consumer
+            if consumer is not None
+            else _create_wired_consumer(session_factory, settings)
         )
+        return MessagingRuntime(
+            pub, cons, worker, poll, batch, sleep=sleep, jitter=jitter
+        )
+    cons = (
+        consumer
+        if consumer is not None
+        else _create_wired_consumer(session_factory, settings)
+    )
     return MessagingRuntime(
-        publisher, consumer, outbox_worker, poll, batch, sleep=sleep, jitter=jitter
+        publisher, cons, outbox_worker, poll, batch, sleep=sleep, jitter=jitter
     )

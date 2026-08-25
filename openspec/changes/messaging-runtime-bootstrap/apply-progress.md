@@ -3,15 +3,15 @@
 ## Work Unit
 
 - Change: `messaging-runtime-bootstrap`
-- Work unit: `messaging-runtime-pr3c-notification-handler` (task 3.3 only)
-- Scope: PR3c only, `process_order_notification.py` + `test_process_order_notification.py`, stacked-to-main on branch `feat/messaging-order-notifications` from `origin/main` `a1db18e` (#69 merged)
+- Work unit: `messaging-runtime-pr3d-container-wiring` (task 3.4 only)
+- Scope: PR3d only, containers + `messaging_runtime.py` + `test_container_wiring.py`, stacked-to-main on branch `feat/messaging-runtime-wiring` from `origin/main` `75a1125` (#70 merged)
 - Artifact store: OpenSpec
 - Mode: Strict TDD (`uv run --project backend python -m pytest`)
 - Delivery: auto-chain, stacked-to-main; each PR targets `main` independently
 - Review budget: 400 complete changed lines; no size:exception
 - Status: success
-- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, code-simplification, review-reliability, security-and-hardening)
-- Previous apply-progress: PR3b `orders-terminal-guard` on `a1db18e`; PR3a `inventory-terminal-guard` on `2e2bfd7`; PR2c `cbb99e3`; PR2b `3d25e66`; PR1 1.1–1.5
+- Skill Resolution: paths-injected (sdd-apply, strict-tdd, chained-pr, work-unit-commits, api-and-interface-design, design-patterns, review-reliability, security-and-hardening)
+- Previous apply-progress: PR3c `notification-handler` on `75a1125`; PR3b `orders-guard` on `a1db18e`; PR3a `inventory-guard` on `2e2bfd7`; PR2c `cbb99e3`; PR2b `3d25e66`; PR1 1.1–1.5
 
 ## Phase Envelope
 
@@ -33,6 +33,7 @@
 - [x] 3.1 RED→GREEN `inventory/application/order_status.py` (`OrderStatusQuery`) + `get_order_status.py` + guard in `process_inventory_reservation.py` + test: terminal skip; duplicate once; no sync-checkout double reserve.
 - [x] 3.2 RED→GREEN guard `process_inventory_result.py` + test: late result on confirmed/cancelled no-ops, skip recorded.
 - [x] 3.3 RED→GREEN `notifications/application/process_order_notification.py` + test: notifies once; duplicate no-op; processed row same transaction.
+- [x] 3.4 GREEN wire containers (orders/inventory/notifications); composition supplies `GetOrderStatus`.
 
 ## PR2a Implementation Summary (preserved)
 
@@ -63,6 +64,7 @@
 | 3.1 | `backend/app/tests/modules/inventory/application/test_inventory_terminal_guard.py` + `inventory/application/order_status.py` + `orders/application/get_order_status.py` + `process_inventory_reservation.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py -v` → 5 passed; `backend/app/tests/runtime -v` → 11 passed (safety net) | `ModuleNotFoundError: No module named 'app.modules.inventory.application.order_status'` (RED: test imports protocol before file exists) | Created `order_status.py` (`@runtime_checkable` Protocol `get_status(UUID)->str|None`) + `get_order_status.py` (`GetOrderStatus` implements Protocol via `OrderRepository.get_by_id`, only `get_status`) + guard in `process_inventory_reservation.py` (`order_status: OrderStatusQuery` required, idempotency first, then `UUID(str(order_id))` → `get_status` → if `confirmed`/`cancelled` → `mark_processed` same consumer/event and return; pending/missing → preserve reservation; malformed UUID raises to consumer nack; duplicate via `is_processed` first) → `uv run --project backend python -m pytest ...test_inventory_terminal_guard.py -v` → 6 passed in 0.03s | Triangulate: `test_get_order_status_returns_status` checks confirmed/cancelled/None (no `execute` alias); `test_terminal_confirmed_skips` (counts, processed, duplicate no-ops) + `test_terminal_cancelled_skips` (second terminal variant); `test_duplicate_reserves_once` (pending duplicate once); `test_sync_checkout_double_reserve_prevented` (confirmed checkout 7/3 unchanged); `test_pending_and_missing_reserve` (pending/None reserves + malformed `order-123` raises `ValueError`, no reservation, no status call) | No new abstraction; guard minimal, no payload logging, required constructor injection — no 3-arg compatibility, no invalid-UUID fallback |
 | 3.2 | `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` + `process_inventory_result.py` guard | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed (safety net); DB `test_process_inventory_result.py` 3 errors `connection refused` honestly reported | `test_terminal_confirmed_late_reserved` → 1 == 0 `save_calls` failed; `test_terminal_skip_regardless` → `InvalidStateTransitionError: Cannot cancel order from status confirmed` — 3 failed, 2 passed proves RED before fix | Added `if order.status in ("confirmed","cancelled"): await mark_processed(event_id,"ProcessOrderInventoryResult"); return` after `is_processed`+`order-not-found` → `5 passed in 0.02s` | Triangulate: `test_terminal_cancelled_late_rejected` second terminal; `test_terminal_skip_regardless_of_result_value` proves `confirmed+rejected` and `cancelled+reserved` both no-op regardless of value (would raise without guard); `test_pending_reserved_confirms_and_pending_rejected_cancels` preserves pending→confirmed/cancelled + duplicate-once | No new abstraction; interface unchanged, no logging of payload/body/credentials, no OrderStatusQuery added |
 | 3.3 | `backend/app/tests/modules/notifications/application/test_process_order_notification.py` + `notifications/application/process_order_notification.py` | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 16 passed (safety net); `test_process_inventory_result` 3 errors `connection refused` honestly reported | `ModuleNotFoundError: No module named 'app.modules.notifications.application.process_order_notification'` — RED proven (test imports handler before file exists; 1 error during collection) | Created `process_order_notification.py` (41 lines, `ProcessOrderNotification(notifier, idempotency)` mandatory, no defaults; `is_processed` first → `UUID(str(aggregate_id))` → event_type `OrderConfirmed`/`OrderCancelled` → channel `email` + deterministic content → `await notifier.execute` → `await mark_processed` same transaction; malformed raises `ValueError`, unknown raises `ValueError`, failure not marked) → `uv run --project backend python -m pytest ...test_process_order_notification.py -v` → **8 passed in 0.03s** (confirmed, cancelled, duplicate, duplicate-skip-without-revalidate, failure-not-marked, malformed, unknown, mandatory-deps) | Triangulate: `test_cancelled` second type, `test_duplicate_skips_without_revalidating` proves duplicate returns before UUID/event-type validation (malformed+unknown no-op), `test_notification_failure_not_marked` proves rollback boundary, `test_malformed`/`test_unknown` prove no notification and no mark; all use DB/broker-free fakes; consumer/runtime harness still 16 passed | No new abstraction; handler minimal, no payload logging, no outbox, no container wiring |
+| 3.4 | `backend/app/tests/runtime/test_container_wiring.py` + `messaging_runtime.py` + containers | Unit | `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/runtime -v` → 20 passed (safety net) | GREEN per tasks.md — composition wiring only | `test_bindings_and_fresh` + `test_session_and_adapters` → 3 passed covering 3 bindings/5 types, fresh factories, same-session GetOrderStatus, strict adapters | Inventory missing/bad/unknown, orders 2 types/unknown/bad, notifications both types — broker-free | No global override, fresh locals, exact contracts |
 
 ## Work Unit Evidence (PR2b — consumer registry only)
 
@@ -205,22 +207,44 @@
 - PostgreSQL unavailable locally — DB integration tests honestly `connection refused` (3 errors for `test_sqlalchemy_repository`, 3 for `test_process_inventory_result`) — not a regression; fake-unit harness proves handler idempotency and same-transaction boundary. Consumer/runtime harness 16 passed proves ack/nack boundary preserved.
 - Budget: complete diff 275/400 inclusive, margin preserved; no `size:exception` needed. Handler 41/0 + test 167/0 + tasks 1/1 + apply-progress 47/18 → 256 ins, 19 del → 275 complete.
 
+## Work Unit Evidence (PR3d — container wiring only)
+
+| Evidence | Required value | Result |
+|---|---|---|
+| Focused test command and exact result | Smallest command proving this unit | `uv run --project backend python -m pytest backend/app/tests/runtime/test_container_wiring.py -v` → **3 passed in 0.16s** (`test_bindings_and_fresh`, `test_session_and_adapters`, `test_providers`) |
+| Runtime harness command/scenario and exact result | Real runtime path | `create_messaging_runtime` builds `MessageConsumer` with 3 queues (`inventory.order_created:OrderCreated`, `orders.inventory_result:InventoryReserved/Rejected`, `notifications.order_terminal:OrderConfirmed/Cancelled`) + fresh local containers per `AsyncSession` where inventory `GetOrderStatus` shares same session; adapters: inventory requires `items` and rejects missing/bad/unknown, orders maps exact 2 types and rejects unknown/bad UUID, notifications delegates exact payload. Consumer/publisher/runtime harness `test_consumer` (5) + `test_rabbitmq_publisher` (4) + `test_runtime` (14 including 3 wiring) → **23 passed** proves transaction/ack boundary. |
+| Rollback boundary | Exact files/behavior | Revert `backend/app/modules/orders/api/container.py` (+6 GetOrderStatus), `backend/app/modules/inventory/api/container.py` (27→37 lines), `backend/app/modules/notifications/api/container.py` (27→35), `backend/app/messaging_runtime.py` (+110 wired consumer with 3 bindings/5 types and strict adapters), `backend/app/tests/runtime/test_container_wiring.py` (168). Restores empty containers and unwired runtime; 1.1–3.3 remain. |
+
+## Validation (post-format, pre-commit, PR3d)
+
+- `uv run --project backend ruff format` + `ruff check` → All checks passed!; `pyrefly check` → 0 errors
+- `uv run --project backend python -m pytest backend/app/tests/runtime/test_container_wiring.py -v` → 3 passed
+- `uv run --project backend python -m pytest backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/shared/messaging/test_rabbitmq_publisher.py backend/app/tests/runtime -v` → 23 passed (5 consumer +4 publisher +14 runtime including 3 wiring)
+
+## PR Boundary and Line Count (against `origin/main` `75a1125`)
+
+- Branch: `feat/messaging-runtime-wiring` from `75a1125` (#70)
+- Tracked diff: `git diff 75a1125 --stat` → 7 files; complete **380 insertions +20 deletions =400 complete** ≤400 (no size:exception)
+- Chain: stacked-to-main — PR3d targets `main`
+
 ## Next Steps
 
-- Next recommended: `sdd-apply` for `messaging-runtime-pr3c-notification-handler` task 3.4 (container wiring supplying `GetOrderStatus` and binding notifications handler), then pr4 chain/integration/CI/docs; keep each PR ≤400 stacked-to-main
-- Do not start 4.x until 3.4 merges
+- Next recommended: `sdd-apply` for 4.x chain/integration/CI/docs; keep each PR ≤400 stacked-to-main
+- Do not start 4.x until PR3d merges
 
-## Relevant Files (PR3c — this slice)
+## Relevant Files (PR3d — this slice)
 
-- `backend/app/modules/notifications/application/process_order_notification.py` — idempotent handler for `OrderConfirmed`/`OrderCancelled`, mandatory `SendOrderNotification`+`ProcessedEventStore`, `is_processed` first → `UUID` parse → deterministic `email`+content → `notifier.execute` → `mark_processed` same consumer transaction (RED→GREEN)
-- `backend/app/tests/modules/notifications/application/test_process_order_notification.py` — 8 unit tests: confirmed/cancelled notify + content, duplicate once, duplicate-skip-without-revalidate, failure-not-marked, malformed UUID, unknown type, mandatory deps (RED→GREEN→TRIANGULATE)
-- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.3 `[x]`, 3.4 and 4.x pending
-- `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — cumulative: 1.1-3.3 complete, 3.4/4.x pending
+- `backend/app/modules/orders/api/container.py` — adds `get_order_status` provider wiring `GetOrderStatus(order_repository=order_repo)` (GREEN)
+- `backend/app/modules/inventory/api/container.py` — mandatory `session`, `order_status_query` Dependency, `inventory_repo/outbox/idempotency` + `process_inventory_reservation` (GREEN)
+- `backend/app/modules/notifications/api/container.py` — `session`, `notification_repo/idempotency/notifier` + `process_order_notification` (GREEN)
+- `backend/app/messaging_runtime.py` — wired `MessageConsumer` 3 bindings/5 types, fresh local containers per message, exact adapters, UUID raises, no payload log, seam preserved (GREEN)
+- `backend/app/tests/runtime/test_container_wiring.py` — 3 focused tests: bindings/fresh, same-session, strict adapters + container providers (GREEN)
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 3.4 `[x]`, 4.x pending
+- `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — cumulative: 1.1–3.4 complete, 4.x pending
 
 ## Relevant Files (history preserved)
 
-- `backend/app/modules/orders/application/process_inventory_result.py` — PR3b terminal guard (6 lines)
-- `backend/app/tests/modules/orders/application/test_order_result_terminal_guard.py` — PR3b 5 tests (219)
-- `backend/app/modules/inventory/application/order_status.py` + `get_order_status.py` + `process_inventory_reservation.py` — PR3a guard + seam
-- `backend/app/shared/messaging/consumer.py` + `test_consumer.py` — PR2b registry (400)
+- `backend/app/modules/orders/application/process_inventory_result.py` — PR3b terminal guard
+- `backend/app/modules/inventory/application/order_status.py` + `get_order_status.py` — PR3a seam
+- `backend/app/shared/messaging/consumer.py` + `test_consumer.py` — PR2b registry
 - `backend/app/shared/messaging/rabbitmq_publisher.py` — PR2a persistent delivery
