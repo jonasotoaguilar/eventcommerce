@@ -38,6 +38,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      rabbitmq:
+        image: rabbitmq:3-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       EVENTCOMMERCE_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/eventcommerce
       EVENTCOMMERCE_POSTGRES_USER: postgres
@@ -45,6 +59,12 @@ jobs:
       EVENTCOMMERCE_POSTGRES_DB: eventcommerce
       EVENTCOMMERCE_POSTGRES_HOST: localhost
       EVENTCOMMERCE_POSTGRES_PORT: "5432"
+      EVENTCOMMERCE_RABBITMQ_HOST: localhost
+      EVENTCOMMERCE_RABBITMQ_PORT: "5672"
+      EVENTCOMMERCE_RABBITMQ_USER: guest
+      EVENTCOMMERCE_RABBITMQ_PASSWORD: guest
+      EVENTCOMMERCE_RABBITMQ_VHOST: /
+      EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION: "1"
 
     steps:
       - name: Checkout
