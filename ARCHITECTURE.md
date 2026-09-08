@@ -7,12 +7,12 @@
 
 ## Overview
 
-EventCommerce is a **modular monolith**: one deployable Python backend composed of bounded contexts that each own their domain model, application services, infrastructure, and API surface. Today a synchronous `checkout` context coordinates order creation, inventory reservation, deterministic payment authorization, and order confirmation/cancellation in a single request. Shared data structures — an event envelope, a shared event store (`domain_events`), a transactional outbox (`outbox_events`), and an idempotency store (`processed_events`) — exist and are exercised by that synchronous path. Event choreography backed by an AMQP consumer and an outbox worker is the MVP Target; no broker is wired at runtime yet.
+EventCommerce is a **modular monolith**: one deployable Python backend composed of bounded contexts that each own their domain model, application services, infrastructure, and API surface. Today a synchronous `checkout` context coordinates order creation, inventory reservation, deterministic payment authorization, and order confirmation/cancellation in a single request. Shared data structures — an event envelope, a shared event store (`domain_events`), a transactional outbox (`outbox_events`), and an idempotency store (`processed_events`) — exist and are exercised by that synchronous path. Event choreography is **Now**: the outbox worker, RabbitMQ publisher, and AMQP consumer are wired into the app lifespan (`backend/app/messaging_runtime.py`, started/stopped by `backend/app/app.py`). Live broker delivery still requires RabbitMQ — proven by the gated CI integration (`EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1`), not the default suite.
 
 | Horizon | State |
 |---|---|
-| **Now** | Five bounded contexts exist in `backend/app/modules/`: `orders`, `inventory`, `payments`, `notifications`, and `checkout`. Orders exposes `POST /api/v1/orders`, `GET /api/v1/orders/{order_id}`, and `GET /api/v1/orders/{order_id}/timeline`; checkout exposes `POST /api/v1/checkout`. Shared event store, transactional outbox, idempotency store, and `dependency-injector` containers are implemented and wired. Inventory, payments, and notifications expose only `GET /api/v1/{module}/_health`. |
-| **MVP Target** | Add `iam`, `catalog`, and `cart`; wire the existing RabbitMQ publisher and outbox worker into a runtime and add an AMQP consumer so contexts react to published events; reach the five-state order lifecycle; add confirm/cancel HTTP routes. |
+| **Now** | Five bounded contexts exist in `backend/app/modules/`: `orders`, `inventory`, `payments`, `notifications`, and `checkout`. Orders exposes `POST /api/v1/orders`, `GET /api/v1/orders/{order_id}`, and `GET /api/v1/orders/{order_id}/timeline`; checkout exposes `POST /api/v1/checkout`. Shared event store, transactional outbox, idempotency store, and `dependency-injector` containers are implemented and wired. Inventory, payments, and notifications expose only `GET /api/v1/{module}/_health`. The messaging runtime is wired: outbox scheduler + RabbitMQ publisher + AMQP consumer start/stop with the app lifespan, and idempotent handlers react to published events. |
+| **MVP Target** | Add `iam`, `catalog`, and `cart`; reach the five-state order lifecycle; add confirm/cancel HTTP routes. |
 | **Future** | Real payment provider, saga orchestration, dead-letter handling, observability stack, frontend. |
 
 ## Topology
@@ -45,8 +45,8 @@ flowchart LR
         ES["Event Store<br/>domain_events<br/>Now"]
         OB["Outbox<br/>outbox_events<br/>Now"]
         PE["Processed Events<br/>idempotency<br/>Now"]
-        RP["RabbitMQ Publisher<br/>module, not wired"]
-        AMQP["AMQP consumer<br/>MVP Target"]
+        RP["RabbitMQ Publisher<br/>Now (lifespan)"]
+        AMQP["AMQP consumer<br/>Now (lifespan)"]
     end
 
     ORD --> O
@@ -66,15 +66,15 @@ flowchart LR
     O --> OB
     CH --> OB
     CH --> PE
-    OB -.-> RP
-    RP -.-> AMQP
-    AMQP -.-> O
-    AMQP -.-> I
-    AMQP -.-> P
-    AMQP -.-> N
+    OB --> RP
+    RP --> AMQP
+    AMQP --> O
+    AMQP --> I
+    AMQP --> P
+    AMQP --> N
 ```
 
-Solid arrows are **Now**; dashed arrows are **MVP Target**. Checkout calls the order, inventory, payment, and notification contexts synchronously and persists to the shared outbox and idempotency store. The RabbitMQ publisher module exists but is not wired into the app runtime; nothing forwards outbox events to a broker and no AMQP consumer exists.
+Solid arrows are **Now**; dashed arrows are **MVP Target**. Checkout calls the order, inventory, payment, and notification contexts synchronously and persists to the shared outbox and idempotency store. The RabbitMQ publisher, outbox scheduler, and AMQP consumer are wired into the app lifespan: `create_messaging_runtime` builds a durable `order.events` TOPIC exchange with three queues (`inventory.order_created`, `orders.inventory_result`, `notifications.order_terminal`), and `app.py` starts/stops the runtime non-fatally (broker-down startup stays healthy, shutdown closes within 10s). Live broker delivery requires RabbitMQ; the default suite proves the chain with a fake publisher (`backend/app/tests/runtime/test_chain_e2e.py`) and the gated integration proves it against a real broker in CI.
 
 ## Bounded contexts
 
@@ -124,18 +124,18 @@ Rules:
 |---|---|---|
 | **Shared event store** | **Now** | `backend/app/shared/events/` — `DomainEvent` base, `domain_events` table, `SqlAlchemyEventRepository`. Orders persists `OrderCreated` and reads timelines from it. |
 | **Shared event envelope** | **Now** | `backend/app/shared/messaging/envelope.py` — `EventEnvelope` with an `event_type` literal. |
-| **Transactional outbox** | **Now (emission)** | `backend/app/shared/messaging/outbox_repository.py` + `outbox_events` table. Checkout and orders persist `OrderCreated` / `OrderConfirmed` / `OrderCancelled`. Forwarding to a broker is not wired. |
-| **RabbitMQ publisher** | **Partial** | `backend/app/shared/messaging/rabbitmq_publisher.py` exists (aio-pika) but is not connected or started by the app runtime. |
-| **Outbox worker** | **Partial** | `backend/app/shared/messaging/outbox_worker.py` exists; no scheduler or lifespan integration. |
-| **AMQP consumer** | **MVP Target** | No consumer module. |
-| **Idempotent consumers** | **Now (primitives)** | `backend/app/shared/messaging/idempotency.py` — `ProcessedEventStore` claims and response cache used end-to-end by checkout. Wired AMQP consumers remain MVP Target. |
-| **Choreography** | **MVP Target** | Contexts will react to published events without a central orchestrator once the outbox worker and AMQP consumer are wired. The current checkout is a deliberate synchronous commerce path. |
+| **Transactional outbox** | **Now** | `backend/app/shared/messaging/outbox_repository.py` + `outbox_events` table + `9e0f1a2b3c4d` composite index on `(status, created_at)`. Checkout and orders persist `OrderCreated` / `OrderConfirmed` / `OrderCancelled`. Forwarding runs via the outbox scheduler in `backend/app/messaging_runtime.py` (poll interval + batch size from settings). |
+| **RabbitMQ publisher** | **Now** | `backend/app/shared/messaging/rabbitmq_publisher.py` (aio-pika) — persistent delivery, `message_id`, `event_type`/`aggregate_id` headers, never logs payloads. Connected at runtime startup (non-fatal; backoff capped at 30s). |
+| **Outbox worker** | **Now** | `backend/app/shared/messaging/outbox_worker.py` (`run_once`) driven by the runtime scheduler loop; publish failure leaves the row pending, logs, and continues. Started/stopped by the app lifespan. |
+| **AMQP consumer** | **Now** | `backend/app/shared/messaging/consumer.py` — `MessageConsumer` on durable `order.events` TOPIC exchange, three durable queues, prefetch 1; unknown/malformed messages acked, handler failures nacked with requeue. Wired with three bindings in `backend/app/messaging_runtime.py`. |
+| **Idempotent consumers** | **Now** | `backend/app/shared/messaging/idempotency.py` — `ProcessedEventStore` claims and response cache used end-to-end by checkout and by the wired AMQP handlers (`ProcessInventoryReservation`, `ProcessOrderInventoryResult`, `ProcessOrderNotification`), each committing handler + `processed_events` in one per-message transaction. |
+| **Choreography** | **Now** | `OrderCreated` → inventory reservation, `InventoryReserved`/`InventoryRejected` → order confirmation/cancellation, terminal events → notifications, via the wired consumer. Proven broker-free by `backend/app/tests/runtime/test_chain_e2e.py` and against a real broker by the gated `backend/app/tests/integration/test_rabbitmq_integration.py` in CI. The synchronous checkout path is retained alongside it. |
 
 ### Persistence topology
 
 - **PostgreSQL** is the single persistence store.
 - Each bounded context owns its tables (`orders`, `inventory`, `payments`, `notifications`).
-- Shared tables `outbox_events`, `processed_events`, and `domain_events` live under `backend/app/shared/` and are **Now**.
+- Shared tables `outbox_events`, `processed_events`, and `domain_events` live under `backend/app/shared/` and are **Now** (`9e0f1a2b3c4d` indexes `outbox_events(status, created_at)` for the scheduler poll).
 - Migrations live in `backend/alembic/versions/` (six migrations covering the initial schema, shared domain events, checkout idempotency, and payments tables).
 
 ## Cross-cutting concerns
@@ -166,7 +166,7 @@ Request-scoped session override via a `dependency-injector` container is **Now**
 
 ### Consistency and idempotency
 
-Idempotency primitives (`ProcessedEventStore`, the `processed_events` table, and the outbox pattern) are **Now** and are exercised end-to-end by checkout: claims with a transaction-scoped advisory lock, durable response cache, and `409` on payload mismatch. Wired consumers that react to published events are **MVP Target**. Domain terms are defined in [docs/GLOSSARY.md](./docs/GLOSSARY.md).
+Idempotency primitives (`ProcessedEventStore`, the `processed_events` table, and the outbox pattern) are **Now** and are exercised end-to-end by checkout: claims with a transaction-scoped advisory lock, durable response cache, and `409` on payload mismatch. Wired consumers that react to published events are **Now** (three bindings in `backend/app/messaging_runtime.py`; live delivery requires RabbitMQ). Domain terms are defined in [docs/GLOSSARY.md](./docs/GLOSSARY.md).
 
 ## Non-functional requirements
 
@@ -175,7 +175,7 @@ The table below tags every target as **Now**, **MVP Target**, or **Future**. Any
 | Concern | Horizon | Target | How measured |
 |---|---|---|---|
 | Order state correctness | Now | 100% of simulated orders end in a valid terminal state with the expected event sequence | Domain tests assert the transitions in `backend/app/modules/orders/domain/services.py`. |
-| Consumer idempotency | Now (checkout path) | Replaying an `Idempotency-Key` produces zero duplicate order, inventory, or payment records | Replay tests around `ProcessedEventStore` and the checkout use case; wired AMQP-consumer replay is MVP Target. |
+| Consumer idempotency | Now | Replaying an `Idempotency-Key` produces zero duplicate order, inventory, or payment records | Replay tests around `ProcessedEventStore` and the checkout use case; wired AMQP-consumer replay is Now (duplicate delivery no-ops; proven by `backend/app/tests/runtime/test_chain_e2e.py`; live delivery requires RabbitMQ). |
 | Payment simulation reproducibility | Now | Identical inputs produce the same authorization result across repeated runs | Deterministic policy tests in `backend/app/modules/payments/tests/test_payment_policy.py`. |
 | End-to-end checkout latency | MVP Target | p95 < 500 ms on the deterministic local path | pytest benchmark around the checkout use case; benchmark evidence is not yet produced. |
 | API health latency | Now | p95 < 100 ms for `GET /health` and module `_health` endpoints | httpx timing against local server. |
@@ -198,10 +198,10 @@ The table below tags every target as **Now**, **MVP Target**, or **Future**. Any
 | Shared event store (`domain_events`) | Now | implemented | `backend/app/shared/events/` — `models.py`, `event_repository.py`, `repository.py`, `domain.py` | Patterns |
 | Shared event envelope | Now | implemented | `backend/app/shared/messaging/envelope.py` | Patterns |
 | Transactional outbox models + repository | Now | implemented | `backend/app/shared/messaging/outbox_repository.py`, `models.py` | Patterns |
-| Outbox worker + scheduler | MVP Target | partial | `backend/app/shared/messaging/outbox_worker.py` exists; no scheduler or runtime wiring | Patterns |
-| RabbitMQ publisher | MVP Target | partial | `backend/app/shared/messaging/rabbitmq_publisher.py` exists; not wired or connected | Patterns |
-| AMQP consumer / event choreography | MVP Target | target | No consumer code | Patterns |
-| Idempotent consumer store (`ProcessedEventStore`) | Now | implemented | `backend/app/shared/messaging/idempotency.py` | Cross-cutting concerns |
+| Outbox worker + scheduler | Now | implemented | `backend/app/shared/messaging/outbox_worker.py` (`run_once`), driven by `backend/app/messaging_runtime.py` scheduler loop; lifespan start/stop in `backend/app/app.py` | Patterns |
+| RabbitMQ publisher | Now | implemented | `backend/app/shared/messaging/rabbitmq_publisher.py` — persistent delivery, `message_id`/`event_type`/`aggregate_id` headers; connected by `MessagingRuntime` with capped-backoff retry | Patterns |
+| AMQP consumer / event choreography | Now | implemented | `backend/app/shared/messaging/consumer.py` (`MessageConsumer`, three durable queues on `order.events`) wired in `backend/app/messaging_runtime.py`; handlers `process_inventory_reservation.py`, `process_inventory_result.py`, `process_order_notification.py`; chain proof `backend/app/tests/runtime/test_chain_e2e.py`; gated broker proof `backend/app/tests/integration/test_rabbitmq_integration.py` + rabbitmq service in `.github/workflows/api-ci.yml` | Patterns |
+| Idempotent consumer store (`ProcessedEventStore`) | Now | implemented | `backend/app/shared/messaging/idempotency.py` — also enforced per-message by wired handlers | Cross-cutting concerns |
 | `processed_events` table + durable response cache | Now | implemented | `backend/app/shared/messaging/models.py` | Cross-cutting concerns |
 | `pydantic-settings` configuration | Now | implemented | `backend/app/shared/config/settings.py` | Cross-cutting concerns |
 | `dependency-injector` DI containers | Now | implemented | `backend/app/modules/*/api/container.py`, wired in `backend/app/app.py` | Cross-cutting concerns |
@@ -216,7 +216,7 @@ The table below tags every target as **Now**, **MVP Target**, or **Future**. Any
 
 ### Commerce event flow
 
-The diagram below shows the delivered synchronous checkout path and what remains target. It deliberately does not draw the AMQP consumer or outbox forwarding as live.
+The diagram below shows the synchronous checkout path and the wired choreography runtime. Broker delivery requires RabbitMQ; the default suite exercises the chain without a broker.
 
 ```mermaid
 sequenceDiagram
@@ -227,8 +227,8 @@ sequenceDiagram
     participant P as payments (Now)
     participant N as notifications (Now)
     participant DE as domain_events (Now)
-    participant OB as outbox_events (Now, not forwarded)
-    participant RP as RabbitMQPublisher (module, not wired)
+    participant OB as outbox_events (Now, forwarded by scheduler)
+    participant RP as RabbitMQPublisher (Now, lifespan-wired)
 
     S->>CHK: POST /api/v1/checkout
     CHK->>O: create order (pending)
@@ -245,8 +245,8 @@ sequenceDiagram
         CHK-->>OB: persist OrderCancelled (pending)
     end
     CHK->>N: best-effort notification
-    Note over OB: No outbox worker/scheduler or AMQP consumer is wired; nothing forwards these events to a broker.
-    OB-.->RP: Target: polled + published when the worker is wired
+    Note over OB: Outbox scheduler forwards pending rows; AMQP consumer dispatches to idempotent handlers. Default suite uses a fake publisher; real-broker proof is the gated CI integration.
+    OB-->RP: polled + published by the wired worker
 ```
 
 ### Order state machine
@@ -271,7 +271,7 @@ Significant decisions are recorded in `docs/adr/`. Status rules and the full ind
 | # | Slug | Status |
 |---|---|---|
 | 0001 | [use-shared-event-store](./docs/adr/0001-use-shared-event-store.md) | Accepted (current implementation) |
-| 0002 | [use-choreography](./docs/adr/0002-use-choreography.md) | Partially implemented — messaging primitives live; consumer wiring is MVP Target |
+| 0002 | [use-choreography](./docs/adr/0002-use-choreography.md) | Delivered (runtime wired; broker liveness via gated CI; no production-operation claim) |
 | 0003 | [use-dependency-injector](./docs/adr/0003-use-dependency-injector.md) | Accepted (current implementation) |
 | 0004 | [own-iam-context](./docs/adr/0004-own-iam-context.md) | Accepted (MVP Target) |
 | 0005 | [use-deterministic-simulated-payments](./docs/adr/0005-use-deterministic-simulated-payments.md) | Accepted (current implementation) |

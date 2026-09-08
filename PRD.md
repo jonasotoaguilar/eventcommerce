@@ -31,18 +31,18 @@ Event-driven systems quickly become hard to reason about when vocabulary, owners
 - Checkout coordinates order creation, inventory reservation, deterministic payment authorization, and order confirmation/cancellation in one request, with durable `Idempotency-Key` handling: a replay returns the cached response, and a reused key with a different payload returns `409`.
 - Shared event envelope, event store, and transactional outbox data structures exist; checkout and orders persist `OrderCreated` / `OrderConfirmed` / `OrderCancelled` events.
 - Deterministic simulated payment policy (ADR 0005) replaces the former random stub.
-- **Not yet live**: AMQP consumer/runtime, outbox scheduler/worker lifespan integration, IAM/JWT/roles, catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
+- Messaging runtime wired into the app lifespan (`backend/app/messaging_runtime.py`, started/stopped by `backend/app/app.py`): outbox scheduler, RabbitMQ publisher, and AMQP consumer with three durable queues; live broker delivery requires RabbitMQ — default suite proves the chain broker-free (`backend/app/tests/runtime/test_chain_e2e.py`), gated CI proves it against a real broker.
+- **Not yet**: IAM/JWT/roles, catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
 
 ## MVP Target
 
-The remaining journey on a single event-driven backend. Checkout, deterministic simulated payments, and the shared event/outbox/idempotency primitives are already delivered (see [Now](#now)); the following close out the MVP:
+The remaining journey on a single event-driven backend. Checkout, deterministic simulated payments, the shared event/outbox/idempotency primitives, and the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ) are already delivered (see [Now](#now)); the following close out the MVP:
 
 - **IAM** as an owned bounded context with JWT registration, login, and role authorization.
 - **Catalog** and **Cart** contexts for product browsing and purchase collection.
-- **Orders** reaching the full five-state lifecycle (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`) driven by event choreography.
-- **Inventory** reserving and releasing stock through events.
-- **Notifications** reacting to order events.
-- **Event choreography** backed by the transactional outbox and idempotent consumers.
+- **Orders** reaching the full five-state lifecycle (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`) driven by event choreography (runtime already wired; intermediate states not yet reachable).
+- **Inventory** reserving and releasing stock across the five-state lifecycle (single-event reservation/result reaction already wired).
+- **Notifications** reacting to order events across the five-state lifecycle (terminal `OrderConfirmed`/`OrderCancelled` reaction already wired).
 
 ## Future
 
@@ -57,13 +57,13 @@ The remaining journey on a single event-driven backend. Checkout, deterministic 
 - Payment authorization must be deterministic: identical inputs always return the same result. (Now)
 - Order status transitions in the current synchronous checkout are `pending` → `{confirmed, cancelled}`, with idempotent self-transitions on terminal states. (Now)
 - MVP Target — five-state lifecycle: order state transitions become `pending` → `{inventory_reserved, cancelled}`, `inventory_reserved` → `{payment_authorized, cancelled}`, and `payment_authorized` → `{confirmed, cancelled}`; no other transitions are allowed.
-- Consumers must be idempotent: processing the same event twice must not duplicate side effects. (Now for the checkout path; wired consumers are MVP Target)
+- Consumers must be idempotent: processing the same event twice must not duplicate side effects. (Now: checkout path and wired AMQP handlers commit handler + `processed_events` in one per-message transaction; live delivery requires RabbitMQ)
 - JWT tokens carry roles; role authorization is enforced at API boundaries. (MVP Target)
 
 ## Non-goals
 
 - Real card processing or PCI compliance in the MVP.
-- Live AMQP consumer or outbox worker as a current capability.
+- Production deployment/operations of the AMQP runtime (wired runtime delivered; live delivery requires RabbitMQ; gated CI proves integration; no production SLA/ops, DLQ, saga, observability, or payment-consumer claim).
 - Web storefront, mobile app, or public SaaS operations.
 - Production-grade observability, SLA guarantees, or multi-region deployment.
 - Saga orchestration and dead-letter queues before the payment flow is stable.
@@ -72,7 +72,7 @@ The remaining journey on a single event-driven backend. Checkout, deterministic 
 
 - **Order state correctness** (Now): 100% of simulated orders end in a valid terminal state following the transitions in `backend/app/modules/orders/domain/services.py` (`pending` → `{confirmed, cancelled}`).
 - **Payment simulation reproducibility** (Now): a fixed input set produces the same authorization result across repeated runs.
-- **Consumer idempotency** (Now for the checkout path): replaying an `Idempotency-Key` produces no duplicate order, inventory, or payment records; wired AMQP-consumer replay is MVP Target.
+- **Consumer idempotency** (Now: checkout path and wired AMQP handlers): replaying an `Idempotency-Key` or redelivering a wired event produces no duplicate order, inventory, or payment records; proven broker-free by `backend/app/tests/runtime/test_chain_e2e.py`, live delivery requires RabbitMQ.
 - **End-to-end checkout latency** (MVP Target): p95 under 500 ms for the deterministic MVP path in local tests; benchmark evidence is not yet produced.
 
 ## Glossary

@@ -37,7 +37,7 @@
 - [x] 4.1 RED→GREEN chain e2e `test_chain_e2e.py` (runtime/): fake publisher, order→inventory→terminal; no broker in default suite.
 - [x] 4.2 GREEN gated integration test `test_rabbitmq_integration.py` (integration/, skip unless env set): restart persistence, topology recovery, EXPLAIN evidence.
 - [x] 4.3 GREEN `.github/workflows/api-ci.yml`: rabbitmq service, gated env, integration job.
-- [ ] 4.4 GREEN docs (after 2.4): `ARCHITECTURE.md` matrix `implemented` + evidence; GLOSSARY wiring; ADR 0002 delivered; README snapshot; no premature AMQP claims.
+- [x] 4.4 GREEN docs (after 2.4): `ARCHITECTURE.md` matrix `implemented` + evidence; GLOSSARY wiring; ADR 0002 delivered; README snapshot; no premature AMQP claims.
 
 ## PR2a Implementation Summary (preserved)
 
@@ -360,3 +360,31 @@
 - CI RED PR #73 run 32809133010 at `test_rabbitmq_integration.py:76`: 60 rows (30 pending) make Seq Scan + Sort cheapest, so index-name/Index Scan asserts nondeterministic; Ruff/format/pyrefly + 300 other tests passed.
 - Fix `backend/app/tests/integration/test_rabbitmq_integration.py` (+4): `SET LOCAL enable_seqscan = OFF` in same txn after `ANALYZE`, before `EXPLAIN`; keeps `ix_outbox_events_status_created_at` + `Index Scan`/`Index Only Scan` + no `Seq Scan` asserts. Transaction-scoped so no leak; still fails when index absent/wrong (planner falls back to Seq Scan, asserts fail); not a catalog-only check. RabbitMQ proof untouched; task 4.4 still `[ ]`.
 - Validation: `ruff format` 1 unchanged, `ruff check` All passed, `ruff format --check` formatted, `pyrefly check` 0 errors, `pytest ...test_rabbitmq_integration.py -v` 1 skipped (gated off), `pytest ...integration + chain_e2e + consumer + publisher -v` 13 passed, 1 skipped.
+## PR4c — docs delivery (task 4.4 only, `messaging-runtime-pr4c-docs`)
+
+- Scope: `ARCHITECTURE.md` + `docs/GLOSSARY.md` + `docs/adr/0002-use-choreography.md` + `README.md` + `tasks.md` (mark 4.4) + `apply-progress.md` (this section). No code, test, CI, or config changes. Docs-only: `coding` mode with simplification practices (cross-link rather than duplicate, smallest owning-document edits).
+- What changed:
+  - `ARCHITECTURE.md`: Overview + Horizon table now state the runtime is wired (`messaging_runtime.py` + `app.py` lifespan); topology labels/arrows solid for publisher → consumer; Patterns table rows (outbox, publisher, worker, consumer, idempotent consumers, choreography) → `Now` with file/test evidence; Status matrix rows (outbox worker, publisher, AMQP consumer/choreography) → `Now`/`implemented` with code + test + CI evidence; commerce flow diagram + note describe the wired worker; ADR index row 0002 → Delivered. Five-state lifecycle, confirm/cancel routes, IAM/catalog/cart, frontend stay Target/Future.
+  - `docs/GLOSSARY.md`: envelope/choreography/outbox/idempotency rows → `Now` with runtime paths; Current-events Consumer column names the real handlers + queues; Consumer-wiring section → `Now` with the three queue→handler bindings; maintenance rule bans production-operation claims.
+  - `docs/adr/0002-use-choreography.md`: Status → Delivered; added honest delivery-scope boundary (wired runtime + broker-free/gated proofs delivered; production deployment/ops, observability, saga, DLQ, five-state explicitly not claimed); context + references updated to wired files/tests.
+  - `README.md`: Now snapshot gains the wired runtime + proof locations + "requires RabbitMQ, no production claim" boundary; MVP Target drops choreography wiring, keeps IAM/catalog/cart/five-state/routes.
+  - Honesty boundary: no present-tense claim beyond delivered behavior; broker liveness conditioned on RabbitMQ; default suite = fake-publisher chain, CI = gated real broker.
+- Evidence:
+  - Focused test command (unchanged code, regression check): `uv run --project backend python -m pytest backend/app/tests/runtime/test_chain_e2e.py backend/app/tests/shared/messaging/test_consumer.py backend/app/tests/shared/messaging/test_rabbitmq_publisher.py -v` → **13 passed in 0.20s** (4 chain + 5 consumer + 4 publisher).
+  - Gated integration (unchanged): `uv run --project backend python -m pytest backend/app/tests/integration/test_rabbitmq_integration.py -v` → **1 skipped** (gated off).
+  - Static: `uv run --project backend ruff check .` → **All checks passed!**; `uv run --project backend pyrefly check` → **0 errors**. (No formatter run: docs-only markdown has no executable surface for `ruff format`.)
+  - Links/paths: every new `backend/app/…`, `docs/…`, `.github/workflows/api-ci.yml` reference verified to exist via `ls` (see Validation); no new links invented.
+  - Runtime harness: **N/A (docs-only)** — no executable surface changed; broker behavior evidenced by the pre-existing gated CI integration, not re-proven here.
+- Rollback boundary: revert the 4 doc files restores pre-4.4 Target wording; `tasks.md` 4.4 `[x]` and this `apply-progress.md` section are SDD artifacts. No code/test/CI behavior affected.
+- PR boundary: `git diff origin/main --numstat` → doc files + `tasks.md` + `apply-progress.md` only; complete (insertions + deletions) ≤400, no size:exception. Chain: stacked-to-main, targets `main` after PR4b merges.
+- Risks: doc/code drift if runtime files move — mitigated by exact-path evidence pointers greppable in CI; no production-operation language to mislead reviewers.
+- Next recommended: `parent-lifecycle` (all tasks 1.1–4.4 complete; verify + sync own receipts and delivery gates).
+
+### Relevant Files (PR4c — this slice)
+
+- `ARCHITECTURE.md` — matrix `implemented` + concrete source/test evidence; topology + flow describe the wired runtime
+- `docs/GLOSSARY.md` — accurate consumer/queue terminology; honest maintenance rule
+- `docs/adr/0002-use-choreography.md` — Delivered with explicit non-claims
+- `README.md` — snapshot matches delivered runtime; remaining MVP Target restated
+- `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 4.4 `[x]` (only checkbox touched)
+- `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — this PR4c evidence (cumulative, 1.1–4.4 preserved)
