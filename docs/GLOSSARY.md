@@ -13,10 +13,10 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 | Term | Definition | Horizon |
 |---|---|---|
 | Bounded context | A module that owns its own domain model, data, and invariants (e.g., `orders`, `inventory`, `checkout`). | Now / Target |
-| Event envelope | The canonical wire format that carries event metadata and payload across contexts. The model exists at `backend/app/shared/messaging/envelope.py`; using it across contexts via a broker is MVP Target. | Now (structure) / Target (use) |
-| Choreography | Contexts react to published events rather than following a central orchestrator. | MVP Target |
-| Transactional outbox | Events are persisted atomically with business state, then forwarded to a broker. Emission is implemented (`outbox_events`); forwarding to a broker is not wired. | Now (emission) / Target (forwarding) |
-| Idempotency | Processing the same event twice must not duplicate side effects. Implemented for the checkout path (`processed_events`); wired AMQP consumers are MVP Target. | Now (checkout path) |
+| Event envelope | The canonical wire format that carries event metadata and payload across contexts. Defined at `backend/app/shared/messaging/envelope.py` and carried across contexts by the wired runtime (publisher + AMQP consumer); live delivery requires RabbitMQ. | Now |
+| Choreography | Contexts react to published events rather than following a central orchestrator. Wired at runtime (`backend/app/messaging_runtime.py` + `backend/app/shared/messaging/consumer.py`); see Consumer wiring. | Now |
+| Transactional outbox | Events are persisted atomically with business state, then forwarded to a broker. Emission (`outbox_events`) and forwarding (outbox scheduler + RabbitMQ publisher in `backend/app/messaging_runtime.py`) are wired; live delivery requires RabbitMQ. | Now |
+| Idempotency | Processing the same event twice must not duplicate side effects. Implemented for the checkout path (`processed_events`) and enforced per-message by the wired AMQP handlers in the same consumer transaction. | Now |
 | Deterministic simulated payment | A payment provider that returns the same authorization result for the same inputs. Implemented in `backend/app/modules/payments/domain/policy.py` (ADR 0005). | Now |
 
 ### Bounded contexts
@@ -43,15 +43,15 @@ The shared envelope at `backend/app/shared/messaging/envelope.py` defines the ca
 
 | Event | Meaning | Producer | Consumer | Code path |
 |---|---|---|---|---|
-| `OrderCreated` | A shopper submitted a checkout and an order aggregate was created. | `orders` (via `CreateOrder`) | AMQP consumers (Target) | `backend/app/modules/orders/domain/events.py`; persisted to `domain_events` and `outbox_events` |
-| `OrderConfirmed` | The order reached the `confirmed` terminal state. | `checkout` | Notifications (best-effort sync); AMQP consumers (Target) | Outbox write in `backend/app/modules/checkout/application/checkout.py` |
-| `OrderCancelled` | The order reached the `cancelled` terminal state. | `checkout` | Inventory release (on payment failure); AMQP consumers (Target) | Outbox write in `backend/app/modules/checkout/application/checkout.py` |
-| `InventoryReserved` | Requested stock was reserved successfully. | `checkout` (via inventory use cases) | AMQP consumers (Target) | Envelope literal; `orders/domain/events.py` dataclass |
-| `InventoryRejected` | Requested stock could not be reserved. | `checkout` (via inventory use cases) | AMQP consumers (Target) | Envelope literal; `orders/domain/events.py` dataclass |
+| `OrderCreated` | A shopper submitted a checkout and an order aggregate was created. | `orders` (via `CreateOrder`) | `ProcessInventoryReservation` via `inventory.order_created` | `backend/app/modules/orders/domain/events.py`; persisted to `domain_events` and `outbox_events` |
+| `OrderConfirmed` | The order reached the `confirmed` terminal state. | `checkout` | `ProcessOrderNotification` via `notifications.order_terminal` (plus best-effort sync notify) | Outbox write in `backend/app/modules/checkout/application/checkout.py` |
+| `OrderCancelled` | The order reached the `cancelled` terminal state. | `checkout` | `ProcessOrderNotification` via `notifications.order_terminal`; inventory release (on payment failure) | Outbox write in `backend/app/modules/checkout/application/checkout.py` |
+| `InventoryReserved` | Requested stock was reserved successfully. | `checkout` (via inventory use cases) | `ProcessOrderInventoryResult` via `orders.inventory_result` | Envelope literal; `orders/domain/events.py` dataclass |
+| `InventoryRejected` | Requested stock could not be reserved. | `checkout` (via inventory use cases) | `ProcessOrderInventoryResult` via `orders.inventory_result` | Envelope literal; `orders/domain/events.py` dataclass |
 
-### Consumer wiring (MVP Target)
+### Consumer wiring (Now)
 
-The choreography target wires these events to consumers through the outbox, RabbitMQ publisher, and AMQP consumer. When that wiring is live, `OrderCreated` triggers inventory reservation, `InventoryReserved` / `InventoryRejected` drive order confirmation or cancellation, and terminal events trigger notifications. Until then, none of these events are forwarded to a broker and no consumer reacts to them.
+The choreography runtime wires these events to consumers through the outbox, RabbitMQ publisher, and AMQP consumer (`backend/app/messaging_runtime.py`, durable `order.events` TOPIC exchange): `inventory.order_created` carries `OrderCreated` → `ProcessInventoryReservation`; `orders.inventory_result` carries `InventoryReserved`/`InventoryRejected` → `ProcessOrderInventoryResult`; `notifications.order_terminal` carries `OrderConfirmed`/`OrderCancelled` → `ProcessOrderNotification`. The synchronous checkout path is retained alongside the wired consumers. Live broker delivery requires RabbitMQ (gated CI integration); the default suite proves the chain broker-free (`backend/app/tests/runtime/test_chain_e2e.py`).
 
 ## State vocabulary
 
@@ -75,4 +75,4 @@ MVP Target adds the intermediate states: `pending` → `inventory_reserved` → 
 1. A code-contract change (event name, order status, bounded-context name, stack component) must update this glossary and any affected root doc in the same change.
 2. The **Current events** table reflects the shared envelope `event_type` literal in `backend/app/shared/messaging/envelope.py`, the domain event dataclasses in `backend/app/modules/orders/domain/events.py`, and the outbox emissions from the checkout path. Keep it in sync with those files.
 3. The **Order status** transitions must match `backend/app/modules/orders/domain/services.py` exactly.
-4. Do not describe unwired AMQP consumers or absent broker wiring as live. Use `MVP Target` for capabilities that have no runtime wiring; use `Now (emission)` / `Target (forwarding)` for partial capabilities.
+4. Do not describe undeployed messaging capabilities as live. Broker delivery requires RabbitMQ; production deployment and operations are out of scope (no such claim is made here).

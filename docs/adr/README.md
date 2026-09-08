@@ -20,7 +20,7 @@ The status column is **independent of the horizon tags** in `PRD.md` and `ARCHIT
 | # | Title | Status |
 |---|-------|--------|
 | 0001 | [Use a shared event store](./0001-use-shared-event-store.md) | Accepted (current implementation) |
-| 0002 | [Use event choreography](./0002-use-choreography.md) | Partially implemented — messaging primitives live; consumer wiring is MVP Target |
+| 0002 | [Use event choreography](./0002-use-choreography.md) | Delivered (runtime wired; broker liveness via gated CI; no production-operation claim) |
 | 0003 | [Use dependency-injector for DI](./0003-use-dependency-injector.md) | Accepted (current implementation) |
 | 0004 | [Own IAM as a bounded context](./0004-own-iam-context.md) | Accepted (MVP Target) |
 | 0005 | [Use deterministic simulated payments](./0005-use-deterministic-simulated-payments.md) | Accepted (current implementation) |

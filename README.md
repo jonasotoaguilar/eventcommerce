@@ -12,7 +12,9 @@ A product-quality portfolio project: a modular, event-driven commerce backend th
 - Durable idempotency and response cache: `Idempotency-Key` claims with replay detection and `409` on payload mismatch, backed by the `processed_events` table.
 - Shared event envelope, event store (`domain_events`), and transactional outbox (`outbox_events`) data structures; checkout and orders persist events to them.
 - Quality checks in CI: `ruff check`, `ruff format --check`, `pyrefly check`, and `pytest`.
-- **Not yet live**: AMQP consumer/runtime, outbox scheduler/worker lifespan integration, IAM/JWT/roles, catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend. The RabbitMQ publisher and outbox worker modules exist but are not wired into the running app.
+- Messaging runtime wired into the app lifespan (`backend/app/messaging_runtime.py` + `backend/app/app.py`): outbox scheduler (composite `(status, created_at)` index, `FOR UPDATE SKIP LOCKED` claims), RabbitMQ publisher (persistent delivery, headers, never logs payloads), and AMQP consumer (durable `order.events` TOPIC exchange, three queues, prefetch 1) with idempotent handlers — `OrderCreated` → inventory reservation, `InventoryReserved`/`InventoryRejected` → order confirmation/cancellation, terminal events → notifications.
+- Chain proof without a broker in the default suite (`backend/app/tests/runtime/test_chain_e2e.py`); real-broker proof gated behind `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` (`backend/app/tests/integration/test_rabbitmq_integration.py`, rabbitmq service in CI). Live broker delivery requires RabbitMQ. No production deployment or operations claim.
+- **Not yet**: IAM/JWT/roles, catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
 
 ### MVP Target
 
@@ -20,7 +22,7 @@ The remaining commerce journey on a single event-driven backend:
 
 - IAM as an owned bounded context with JWT registration, login, and role authorization.
 - Catalog and cart contexts for product browsing and purchase collection.
-- Live event choreography: wire the AMQP consumer and outbox worker so contexts react to published events instead of the synchronous checkout path.
+- Live event choreography is wired (see Now above); remaining work is IAM, catalog/cart, the five-state lifecycle, and confirm/cancel routes.
 - The full five-state order lifecycle (`pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`) and confirm/cancel HTTP routes.
 
 ### Future
