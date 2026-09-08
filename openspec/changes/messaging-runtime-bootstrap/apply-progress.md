@@ -354,3 +354,9 @@
 - `.github/workflows/api-ci.yml` — extend pipeline: `rabbitmq:3-management-alpine` `rabbitmq-diagnostics ping`, `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` + `RABBITMQ_*`, preserve `postgres:16-alpine` (GREEN, +20)
 - `openspec/changes/messaging-runtime-bootstrap/tasks.md` — mark 4.2 `[x]`, 4.3 `[x]`, 4.4 pending
 - `openspec/changes/messaging-runtime-bootstrap/apply-progress.md` — add PR4b evidence, preserve 1.1–4.1+PR4a
+
+### PR4b remediation — CI RED deterministic EXPLAIN (no task checkbox change)
+
+- CI RED PR #73 run 32809133010 at `test_rabbitmq_integration.py:76`: 60 rows (30 pending) make Seq Scan + Sort cheapest, so index-name/Index Scan asserts nondeterministic; Ruff/format/pyrefly + 300 other tests passed.
+- Fix `backend/app/tests/integration/test_rabbitmq_integration.py` (+4): `SET LOCAL enable_seqscan = OFF` in same txn after `ANALYZE`, before `EXPLAIN`; keeps `ix_outbox_events_status_created_at` + `Index Scan`/`Index Only Scan` + no `Seq Scan` asserts. Transaction-scoped so no leak; still fails when index absent/wrong (planner falls back to Seq Scan, asserts fail); not a catalog-only check. RabbitMQ proof untouched; task 4.4 still `[ ]`.
+- Validation: `ruff format` 1 unchanged, `ruff check` All passed, `ruff format --check` formatted, `pyrefly check` 0 errors, `pytest ...test_rabbitmq_integration.py -v` 1 skipped (gated off), `pytest ...integration + chain_e2e + consumer + publisher -v` 13 passed, 1 skipped.

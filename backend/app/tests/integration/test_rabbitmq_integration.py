@@ -66,6 +66,10 @@ async def test_rabbitmq_persistent_survives_restart_and_explain_uses_index() -> 
                 )
             await conn.commit()
             await conn.execute(text("ANALYZE outbox_events"))
+            # CI RED PR #73 run 32809133010: 60 rows make Seq Scan + Sort
+            # cheapest; transaction-scoped enable_seqscan=off surfaces the
+            # composite index when present, still Seq Scan when absent/wrong.
+            await conn.execute(text("SET LOCAL enable_seqscan = OFF"))
             res = await conn.execute(
                 text(
                     "EXPLAIN SELECT id FROM outbox_events "
