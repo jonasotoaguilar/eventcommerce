@@ -1,6 +1,6 @@
 # Glossary
 
-Canonical domain and event vocabulary for `eventcommerce`. Use this document to keep product and implementation language aligned. Product intent lives in [PRD.md](../PRD.md); system structure lives in [ARCHITECTURE.md](../ARCHITECTURE.md); target UX lives in [DESIGN.md](../DESIGN.md).
+Canonical domain and event vocabulary for `eventcommerce`. Use this document to keep product and implementation language aligned. Product intent lives in [PRD.md](../PRD.md); target UX lives in [DESIGN.md](../DESIGN.md).
 
 ## Usage
 

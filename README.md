@@ -34,7 +34,7 @@ The remaining commerce journey on a single event-driven backend:
 ## Five-minute path
 
 1. Read the [Product Requirements](./PRD.md) for the vision, personas, and MVP scope.
-2. Read [ARCHITECTURE.md](./ARCHITECTURE.md) for bounded contexts, patterns, and current implementation status, and [DESIGN.md](./DESIGN.md) for UX flows and component states.
+2. Read [DESIGN.md](./DESIGN.md) for UX flows and component states.
 3. Check the [Glossary](./docs/GLOSSARY.md) for event and domain vocabulary.
 4. Review the [Decision Records](./docs/adr/) for the non-obvious choices.
 5. Browse `backend/app/` to see the code that backs the current state.
@@ -55,7 +55,6 @@ The remaining commerce journey on a single event-driven backend:
 | Document | Responsibility |
 |----------|--------------|
 | [PRD.md](./PRD.md) | Vision, problem, personas, journeys, MVP scope, business rules, non-goals, and metrics |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Topology, bounded contexts, patterns, NFRs, current implementation status, and ADR index |
 | [DESIGN.md](./DESIGN.md) | Target UX flows, screen inventory, tokens, and states |
 | [docs/GLOSSARY.md](./docs/GLOSSARY.md) | Domain terms and event vocabulary |
 | [docs/adr/](./docs/adr/) | Architecture Decision Records |

@@ -29,6 +29,5 @@ Replace the random stub with a deterministic simulated payment provider behind t
 ## References
 
 - [PRD.md](../../PRD.md) — Business Rules / MVP Target
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — Current Implementation Status matrix
 - [GLOSSARY.md](../GLOSSARY.md) — deterministic simulated payment
 - `backend/app/modules/payments/application/authorize_payment.py`

@@ -29,5 +29,4 @@ Build IAM as an owned `iam` bounded context with JWT registration, login, and ro
 ## References
 
 - [PRD.md](../../PRD.md) — MVP Target / IAM
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — Bounded contexts / Security and auth boundaries
 - [GLOSSARY.md](../GLOSSARY.md) — bounded context

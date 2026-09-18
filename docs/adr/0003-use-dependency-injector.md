@@ -28,7 +28,6 @@ Continue with `dependency-injector`: one container per bounded context, module-l
 
 ## References
 
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — Cross-cutting concerns / DI container strategy
 - `backend/app/modules/orders/api/container.py`
 - `backend/app/modules/orders/api/routes.py`
 - `backend/app/modules/inventory/api/container.py`

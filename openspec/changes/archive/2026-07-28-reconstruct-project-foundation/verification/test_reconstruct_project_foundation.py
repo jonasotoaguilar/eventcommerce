@@ -9,7 +9,7 @@ R = Path(__file__).resolve().parents[5]
 N = {"OrderCreated", "InventoryReserved", "PaymentAuthorized", "OrderNotificationSent"}
 N_TARGET = {"InventoryRejected", "OrderConfirmed", "OrderCancelled"}
 D = {k: R / v for k, v in {
-    "R": "README.md", "P": "PRD.md", "A": "ARCHITECTURE.md",
+    "R": "README.md", "P": "PRD.md",
     "D": "DESIGN.md", "G": "docs/GLOSSARY.md", "I": "docs/adr/README.md",
 }.items()}
 X = ["backend/app/**", "backend/README.md", "backend/pyproject.toml",
@@ -45,24 +45,21 @@ def test_s1_readme_sections(needle):
     assert needle in read(D["R"]).lower()
 def test_s1_readme_links_resolve():
     links = links_of(read(D["R"]))
-    assert len(links) >= 5 and all((D["R"].parent / x).resolve().exists() for x in links)
-@pytest.mark.parametrize("tgt", ["prd.md", "architecture.md", "design.md", "docs/glossary.md", "docs/adr/"])
+    assert len(links) >= 4 and all((D["R"].parent / x).resolve().exists() for x in links)
+@pytest.mark.parametrize("tgt", ["prd.md", "design.md", "docs/glossary.md", "docs/adr/"])
 def test_s1_readme_links_each_root(tgt):
     assert tgt in read(D["R"]).lower()
 
-# S2 R2 — ownership
-def test_s2_no_personas_in_arch():
-    assert not re.search(r"^##+\s+.*persona", read(D["A"]), re.M | re.I)
+# S2 R2 — ownership (ARCHITECTURE.md removed: no architecture-owned area remains)
+def test_s2_no_architecture_references():
+    for k, doc in D.items():
+        assert "architecture.md" not in read(doc).lower(), f"{doc.name} still references ARCHITECTURE.md"
+    for adr in (R / "docs/adr").glob("*.md"):
+        assert "architecture.md" not in adr.read_text().lower(), f"{adr.name} still references ARCHITECTURE.md"
 def test_s2_no_topology_in_prd():
     assert not re.search(r"^##+\s+.*topology", read(D["P"]), re.M | re.I)
 
-# S3 R3 — matrix honesty
-@pytest.mark.parametrize("status", ["implemented", "partial", "target"])
-def test_s3_matrix_status_enum(status):
-    assert f"| {status} |" in read(D["A"])
-def test_s3_no_dishonest_live_claim():
-    t = read(D["A"])
-    assert "AMQP consumer is live" not in t and "outbox worker is running" not in t
+# S3 R3 — honesty (status matrix removed with ARCHITECTURE.md; PRD honesty remains)
 def test_s3_prd_honest_amqp():
     assert not re.search(r"(?i)(amqp|rabbitmq|consumer|outbox)\s+is\s+(live|implemented|running)", read(D["P"]))
 
@@ -99,11 +96,9 @@ def test_s5_no_shared_infra():
 def test_s6_prd_declares(needle):
     assert needle in read(D["P"]).lower()
 
-# S7 R6 — overlap is linked, not copied
-def test_s7_arch_links_glossary():
-    assert "docs/glossary.md" in read(D["A"]).lower()
-def test_s7_arch_links_adr_index():
-    assert "docs/adr/readme.md" in read(D["A"]).lower()
+# S7 — overlap is linked, not copied (ARCHITECTURE.md removed: PRD links GLOSSARY, not a copy)
+def test_s7_prd_links_glossary():
+    assert "docs/glossary.md" in read(D["P"]).lower()
 
 # S8 R6 — glossary + ADR content
 def test_s8_glossary_producer_consumer():

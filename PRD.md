@@ -77,4 +77,4 @@ The remaining journey on a single event-driven backend. Checkout, deterministic 
 
 ## Glossary
 
-Domain terms and event vocabulary are owned by the [Glossary](./docs/GLOSSARY.md). Architecture decisions are recorded in the [Decision Records](./docs/adr/) and summarized in [ARCHITECTURE.md](./ARCHITECTURE.md). Target UX flows live in [DESIGN.md](./DESIGN.md).
+Domain terms and event vocabulary are owned by the [Glossary](./docs/GLOSSARY.md). Architecture decisions are recorded in the [Decision Records](./docs/adr/). Target UX flows live in [DESIGN.md](./DESIGN.md).
