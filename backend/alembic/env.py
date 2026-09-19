@@ -15,6 +15,7 @@ from app.modules.orders.infrastructure.models import (  # noqa: F401
 from app.modules.inventory.infrastructure.models import InventoryModel  # noqa: F401
 from app.modules.payments.infrastructure.models import PaymentModel  # noqa: F401
 from app.modules.notifications.infrastructure.models import NotificationModel  # noqa: F401
+from app.modules.iam.infrastructure.models import UserModel  # noqa: F401
 from app.shared.events.models import DomainEventModel  # noqa: F401
 from app.shared.messaging.models import (  # noqa: F401
     OutboxEventModel,
