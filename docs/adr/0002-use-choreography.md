@@ -32,7 +32,6 @@ Use event choreography for the MVP: contexts react to events published via the t
 ## References
 
 - [PRD.md](../../PRD.md) — MVP Target / coordination model
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — Patterns
 - [GLOSSARY.md](../GLOSSARY.md) — choreography, transactional outbox, idempotency
 - `backend/app/shared/messaging/outbox_repository.py` — implemented outbox repository
 - `backend/app/shared/messaging/idempotency.py` — implemented idempotency store

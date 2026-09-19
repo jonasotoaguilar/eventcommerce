@@ -125,13 +125,13 @@ components:
 # Design
 
 > **Target Design Notice**
-> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes a synchronous `POST /api/v1/checkout` and an orders HTTP API, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), system structure in [ARCHITECTURE.md](./ARCHITECTURE.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
+> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes a synchronous `POST /api/v1/checkout` and an orders HTTP API, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
 
 ## Overview
 
 The design is built around two ideas: **trustworthy commerce** and **event-status transparency. Shoppers must always know what happened, what is happening, and what will happen next. Store operators must see the same truth across inventory and orders. The UI favors clear hierarchy, calm feedback, and honest labels over decorative surfaces.
 
-This document owns the target screen map, user flows, visual tokens, component states, and accessibility rules. It does not duplicate backend architecture, event choreography, bounded context boundaries, or ADR rationale; those live in [ARCHITECTURE.md](./ARCHITECTURE.md) and the [ADR index](./docs/adr/README.md).
+This document owns the target screen map, user flows, visual tokens, component states, and accessibility rules. It does not duplicate event choreography or ADR rationale; those are recorded in the [ADR index](./docs/adr/README.md).
 
 ## Flows
 
@@ -281,6 +281,6 @@ Components are described by responsibility and states, not by framework-specific
 - **Do** reserve primary color for the main action on a screen; do not paint every CTA primary.
 - **Do** provide an empty state with a clear next action instead of a blank area.
 - **Don't** use present-tense claims for screens marked MVP Target or Future.
-- **Don't** duplicate backend topology diagrams; link to [ARCHITECTURE.md](./ARCHITECTURE.md).
+- **Don't** duplicate backend topology diagrams.
 - **Don't** rely on color alone to communicate status; pair it with text and icons.
 - **Don't** block the shopper on polling if the backend consumer is not yet live; surface the honest pending state instead.

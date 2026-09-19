@@ -13,7 +13,7 @@ This directory records significant architecture and product decisions for EventC
 | **Accepted (MVP Target)** | The decision is approved for the MVP vertical slice but has no implementation yet. |
 | **Deprecated / Superseded** | Replaced by a newer ADR; not used for this foundation set. |
 
-The status column is **independent of the horizon tags** in `PRD.md` and `ARCHITECTURE.md`. `Now` / `MVP Target` / `Future` describe planning buckets; the ADR status describes the implementation state of that decision.
+The status column is **independent of the horizon tags** in `PRD.md`. `Now` / `MVP Target` / `Future` describe planning buckets; the ADR status describes the implementation state of that decision.
 
 ## Index
 
@@ -31,4 +31,4 @@ The status column is **independent of the horizon tags** in `PRD.md` and `ARCHIT
 - **MVP Target** — approved for the next vertical slice, no code yet.
 - **Future** — not committed; may be revisited.
 
-See [ARCHITECTURE.md](../../ARCHITECTURE.md) for the current implementation matrix and [PRD.md](../../PRD.md) for product scope.
+See [PRD.md](../../PRD.md) for product scope.

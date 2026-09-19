@@ -27,7 +27,6 @@ Accept a shared event store for the MVP: a neutral `DomainEvent` base, a single 
 
 ## References
 
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — Patterns / Current Implementation Status matrix
 - [GLOSSARY.md](../GLOSSARY.md) — event vocabulary
 - `backend/app/shared/events/domain.py` — `DomainEvent` base
 - `backend/app/shared/events/models.py` — `domain_events` ORM model

@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Governs the root doc set (`README`, `PRD`, `ARCHITECTURE`, `DESIGN`, `docs/GLOSSARY`, `docs/adr/`): per-doc ownership, Now/MVP Target/Future honesty, code-contract lock-in against verified current code.
+Governs the root doc set (`README`, `PRD`, `DESIGN`, `docs/GLOSSARY`, `docs/adr/`): per-doc ownership, Now/MVP Target/Future honesty, code-contract lock-in against verified current code.
 
 ## Requirements
 
 ### Requirement: Canonical Document Set and Navigation
 
-Project MUST ship root `README.md`, `PRD.md`, `ARCHITECTURE.md`, `DESIGN.md` + `docs/GLOSSARY.md` + `docs/adr/`. `README.md` MUST link to the other three root docs and top-level layout in its 5-min quick path.
+Project MUST ship root `README.md`, `PRD.md`, `DESIGN.md` + `docs/GLOSSARY.md` + `docs/adr/`. `README.md` MUST link to the other two root docs and top-level layout in its 5-min quick path.
 
 #### Scenario: Canonical paths and README links
 
@@ -24,14 +24,14 @@ Each doc MUST own a unique area; cross-refs are links, not copies. The owned are
 
 ### Requirement: Now / MVP Target / Future Honesty Rule
 
-Every capability claim MUST be tagged Now, MVP Target, or Future. `ARCHITECTURE.md` MUST include a Current Implementation Status matrix (Decision, Status `implemented`/`partial`/`target`, Code evidence, Doc location). `DESIGN.md` is target; only its Now column binds. No present-tense for non-implemented capabilities. When the messaging runtime ships, its matrix rows (publisher, outbox worker, consumer runtime) MUST be marked `implemented` with code-evidence pointers; undeployed messaging capabilities stay tagged Target/Future.
+Every capability claim MUST be tagged Now, MVP Target, or Future. `DESIGN.md` is target; only its Now column binds. No present-tense for non-implemented capabilities. The delivered messaging runtime (publisher, outbox worker, consumer runtime) MUST be tagged `Now` with code-evidence pointers; undeployed messaging capabilities stay tagged Target/Future.
 (Previously: assumed the AMQP consumer and outbox worker were not yet bootstrapped)
 
-#### Scenario: Status matrix and language are honest about the delivered runtime
+#### Scenario: Language is honest about the delivered runtime
 
 - GIVEN the messaging runtime is delivered (publisher, outbox scheduler, consumer runtime wired)
-- WHEN a reviewer reads the matrix and greps `PRD.md` + `ARCHITECTURE.md` for messaging claims
-- THEN delivered rows carry Status `implemented` with code-evidence pointers AND no capability beyond delivered behavior uses present-tense business language
+- WHEN a reviewer greps `PRD.md` for messaging claims
+- THEN delivered capabilities carry `Now` tags with code-evidence pointers AND no capability beyond delivered behavior uses present-tense business language
 
 ### Requirement: Code-Contract Lock-In — Source Hierarchy
 
@@ -63,7 +63,7 @@ A current-capability claim MUST be backed by an existing `backend/app/` file in 
 
 #### Scenario: No invented current capability
 
-- GIVEN a doc claims a current capability; WHEN a reviewer locates the implementing code; THEN the file exists in `backend/app/` in the published tree and is referenced in the status matrix, OR the claim is tagged Target
+- GIVEN a doc claims a current capability; WHEN a reviewer locates the implementing code; THEN the file exists in `backend/app/` in the published tree, OR the claim is tagged Target
 
 ### Requirement: Product Contract
 
@@ -75,11 +75,11 @@ A current-capability claim MUST be backed by an existing `backend/app/` file in 
 
 ### Requirement: Required Sections per Document
 
-Each root doc MUST contain its required sections. Section matrix (each doc owns only its row): `README`=pitch,quick-path,layout,index,contribution-pointer; `PRD`=vision,problem,personas,journeys,MVP,rules,non-goals,metrics,glossary-pointer; `ARCHITECTURE`=topology,contexts,patterns,cross-cutting,NFRs,status-matrix,ADR-index; `DESIGN`=target-header,flows(Now/Target),screen-inventory,tokens,states,a11y; `GLOSSARY`=domain terms+event entries; `ADR`=title,status,context,decision,consequences (1/file). `docs/GLOSSARY.md` MUST list each of the 7 governed event types (4 Now + 3 MVP Target) with producer and consumer. `docs/adr/` MUST seed ≥1 ADR per: shared event store, choreography over saga, `dependency-injector`, IAM bounded context, deterministic simulated payments.
+Each root doc MUST contain its required sections. Section matrix (each doc owns only its row): `README`=pitch,quick-path,layout,index,contribution-pointer; `PRD`=vision,problem,personas,journeys,MVP,rules,non-goals,metrics,glossary-pointer; `DESIGN`=target-header,flows(Now/Target),screen-inventory,tokens,states,a11y; `GLOSSARY`=domain terms+event entries; `ADR`=title,status,context,decision,consequences (1/file). `docs/GLOSSARY.md` MUST list each of the 7 governed event types (4 Now + 3 MVP Target) with producer and consumer. `docs/adr/` MUST seed ≥1 ADR per: shared event store, choreography over saga, `dependency-injector`, IAM bounded context, deterministic simulated payments.
 
 #### Scenario: Overlapping claims are linked, not duplicated
 
-- GIVEN a fact in `PRD.md` overlaps an area owned by `ARCHITECTURE.md`; WHEN a reviewer searches both; THEN the fact appears in `PRD.md` AND `ARCHITECTURE.md` references it via link, not verbatim copy
+- GIVEN a fact in `PRD.md` overlaps an area owned by another canonical doc; WHEN a reviewer searches both; THEN the fact appears in `PRD.md` AND the other doc references it via link, not verbatim copy
 
 #### Scenario: GLOSSARY and ADR seed cover the contract
 
@@ -87,15 +87,15 @@ Each root doc MUST contain its required sections. Section matrix (each doc owns 
 
 ### Requirement: Cross-Links and Maintainability
 
-`README.md` MUST link to the other three root docs. `ARCHITECTURE.md` MUST link to `docs/adr/` and `DESIGN.md`. Each root doc MUST link to `docs/GLOSSARY.md` for any domain or event term. A code-contract change (event name, order state, context name, stack component) MUST update `docs/GLOSSARY.md` and any affected root doc in the same change.
+`README.md` MUST link to the other two root docs. Each root doc MUST link to `docs/GLOSSARY.md` for any domain or event term. A code-contract change (event name, order state, context name, stack component) MUST update `docs/GLOSSARY.md` and any affected root doc in the same change.
 
 #### Scenario: Cross-link round trip resolves
 
-- GIVEN the docs are merged; WHEN a reviewer follows `README → PRD → GLOSSARY`, `ARCHITECTURE → ADR`, `ARCHITECTURE → DESIGN`; THEN every link resolves to an existing anchor or file AND no chain is broken
+- GIVEN the docs are merged; WHEN a reviewer follows `README → PRD → GLOSSARY`; THEN every link resolves to an existing anchor or file AND no chain is broken
 
 ### Requirement: Authorship Order, 400-Line Gate, and Link Resolution
 
-Each root doc diff MUST fit ≤400 lines (excl. generated diagrams). Authorship order `README → PRD → ARCHITECTURE → DESIGN` governs sequencing only — NOT link direction. Links MAY reference canonical planned paths from slice 1; by completion, every link MUST resolve. PR topology is `sdd-tasks`-decided; no PR count or branch plan is pre-committed.
+Each root doc diff MUST fit ≤400 lines (excl. generated diagrams). Authorship order `README → PRD → DESIGN` governs sequencing only — NOT link direction. Links MAY reference canonical planned paths from slice 1; by completion, every link MUST resolve. PR topology is `sdd-tasks`-decided; no PR count or branch plan is pre-committed.
 
 #### Scenario: All cross-doc links resolve at completion
 
@@ -117,13 +117,13 @@ MUST NOT modify: `backend/app/**`, `backend/README.md`, `backend/pyproject.toml`
 
 ### Requirement: Messaging Delivery Evidence in Docs
 
-The change that ships the messaging runtime MUST update, in the same change: `ARCHITECTURE.md` status matrix rows (publisher, outbox worker, consumer runtime), `docs/GLOSSARY.md` consumer-wiring and queue-binding entries, `docs/adr/0002-use-choreography.md` delivery status, and `README.md` status snapshot. No doc MUST claim AMQP is live before the runtime ships.
+The change that ships the messaging runtime MUST update, in the same change: `docs/GLOSSARY.md` consumer-wiring and queue-binding entries, `docs/adr/0002-use-choreography.md` delivery status, and `README.md` status snapshot. No doc MUST claim AMQP is live before the runtime ships.
 
 #### Scenario: Docs updated in the same change
 
 - GIVEN the messaging runtime change is merged
-- WHEN a reviewer checks the four doc surfaces
-- THEN matrix rows, glossary wiring, ADR status, and README snapshot match delivered behavior
+- WHEN a reviewer checks the three doc surfaces
+- THEN glossary wiring, ADR status, and README snapshot match delivered behavior
 
 #### Scenario: No premature AMQP claims
 
