@@ -43,6 +43,13 @@ class Settings(BaseSettings):
         default=100, alias="EVENTCOMMERCE_RABBITMQ_OUTBOX_BATCH_SIZE"
     )
 
+    jwt_secret: str = Field(default="", alias="EVENTCOMMERCE_JWT_SECRET")
+    jwt_issuer: str = Field(default="", alias="EVENTCOMMERCE_JWT_ISSUER")
+    jwt_audience: str = Field(default="", alias="EVENTCOMMERCE_JWT_AUDIENCE")
+    jwt_expires_minutes: int = Field(
+        default=30, alias="EVENTCOMMERCE_JWT_EXPIRES_MINUTES"
+    )
+
     @computed_field
     def database_url(self) -> str:
         return (

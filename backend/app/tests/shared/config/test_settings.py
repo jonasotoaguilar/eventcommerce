@@ -41,3 +41,13 @@ class TestSettings:
         settings = Settings()
         assert settings.app_name == "TestApp"
         assert settings.debug is True
+
+    def test_jwt_settings_use_prefix_with_30_min_default(self, monkeypatch):
+        monkeypatch.delenv("EVENTCOMMERCE_JWT_EXPIRES_MINUTES", raising=False)
+        monkeypatch.setenv("EVENTCOMMERCE_JWT_SECRET", "s")
+        monkeypatch.setenv("EVENTCOMMERCE_JWT_ISSUER", "iss")
+        monkeypatch.setenv("EVENTCOMMERCE_JWT_AUDIENCE", "aud")
+
+        settings = Settings()
+        assert (settings.jwt_secret, settings.jwt_issuer) == ("s", "iss")
+        assert (settings.jwt_audience, settings.jwt_expires_minutes) == ("aud", 30)
