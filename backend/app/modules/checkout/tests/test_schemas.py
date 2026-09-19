@@ -139,12 +139,17 @@ class TestAmountValidation:
 class TestMissingFields:
     """Any required field absent yields a validation error."""
 
-    @pytest.mark.parametrize("field", ["customer_id", "items", "amount", "currency"])
+    @pytest.mark.parametrize("field", ["items", "amount", "currency"])
     def test_missing_required_field_rejected(self, field: str) -> None:
         payload = valid_request()
         del payload[field]
         with pytest.raises(ValidationError):
             CheckoutRequest.model_validate(payload)
+
+    def test_missing_customer_id_validates_to_none(self) -> None:
+        payload = valid_request()
+        del payload["customer_id"]
+        assert CheckoutRequest.model_validate(payload).customer_id is None
 
 
 class TestItemUniquenessAndBounds:
