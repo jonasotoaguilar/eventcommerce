@@ -24,6 +24,8 @@ from app.modules.checkout.api.schemas import CheckoutRequest, VISIBLE_ASCII_PATT
 from app.modules.checkout.application.checkout import Checkout, CheckoutResult
 from app.modules.checkout.application.errors import IdempotencyConflictError
 from app.modules.checkout.application.helpers import hash_key
+from app.modules.iam.api.dependencies import get_current_user
+from app.modules.iam.application.tokens import CurrentUser
 from app.shared.db.session import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,7 @@ def _with_idempotency_header(
 @router.post("", status_code=201)
 async def create_checkout(
     body: CheckoutRequest,
+    current: CurrentUser = Depends(get_current_user),
     idempotency_key: str | None = Header(
         default=None,
         alias="Idempotency-Key",
@@ -79,6 +82,8 @@ async def create_checkout(
 ) -> JSONResponse:
     session, use_case = session_and_use_case
     request = _with_idempotency_header(body, idempotency_key)
+    # The JWT subject is authoritative: any client-sent customer_id is dropped.
+    request = request.model_copy(update={"customer_id": str(current.user_id)})
     key = request.idempotency_key
     key_hash = hash_key(key) if key is not None else ""
     logger.info("checkout_started key_hash=%s", key_hash)
