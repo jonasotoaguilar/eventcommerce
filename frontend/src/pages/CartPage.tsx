@@ -131,8 +131,10 @@ export function CartPage() {
               <p className="cart-subtotal">
                 Subtotal: {formatMoney(state.cart.subtotal, state.cart.currency)}
               </p>
-              <p className="notice" role="status">
-                Checkout opens in the next work unit.
+              <p className="cta-row">
+                <Link className="button button-primary" to="/checkout">
+                  Proceed to checkout
+                </Link>
               </p>
             </>
           )}

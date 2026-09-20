@@ -3,16 +3,18 @@ import { AuthProvider } from "./auth/session";
 import { Layout } from "./components/Layout";
 import { CartPage } from "./pages/CartPage";
 import { CatalogPage } from "./pages/CatalogPage";
+import { CheckoutPage } from "./pages/CheckoutPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { OrderTrackingPage } from "./pages/OrderTrackingPage";
 import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 
 /**
- * U2 route map: public home, catalog browse/detail, and auth pages;
- * the cart stays authenticated behind <ProtectedRoute>. U3 adds
- * checkout and order tracking.
+ * U3 route map: public home, catalog browse/detail, and auth pages;
+ * cart, checkout, and order tracking stay authenticated behind
+ * <ProtectedRoute>.
  */
 export function App() {
   return (
@@ -28,6 +30,22 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <CartPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute>
+                  <CheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders/:id"
+              element={
+                <ProtectedRoute>
+                  <OrderTrackingPage />
                 </ProtectedRoute>
               }
             />
