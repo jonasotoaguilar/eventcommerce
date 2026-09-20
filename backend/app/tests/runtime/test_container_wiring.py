@@ -206,3 +206,17 @@ def test_cart_routes_registered():
     assert ("/api/v1/cart/items", "POST") in found
     assert ("/api/v1/cart/items/{product_id}", "PATCH") in found
     assert ("/api/v1/cart/items/{product_id}", "DELETE") in found
+
+
+def test_checkout_container_wires_cart_and_catalog_repos_to_the_request_session():
+    from app.modules.checkout.api.container import checkout_container
+
+    s = _FakeSession()  # type: ignore
+    checkout_container.session.override(s)
+    try:
+        checkout = checkout_container.checkout()
+    finally:
+        checkout_container.session.reset_override()
+    assert checkout._cart_repo._session is s  # type: ignore
+    assert checkout._product_repo._session is s  # type: ignore
+    assert checkout._session is s

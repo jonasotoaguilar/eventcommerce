@@ -10,6 +10,12 @@ from dependency_injector import containers, providers
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.checkout.application.checkout import Checkout
+from app.modules.cart.infrastructure.sqlalchemy_repository import (
+    SqlAlchemyCartRepository,
+)
+from app.modules.catalog.infrastructure.sqlalchemy_repository import (
+    SqlAlchemyProductRepository,
+)
 from app.modules.inventory.infrastructure.sqlalchemy_repository import (
     SqlAlchemyInventoryRepository,
 )
@@ -49,6 +55,8 @@ class CheckoutContainer(containers.DeclarativeContainer):
         SqlAlchemyNotificationRepository, session=session
     )
     idempotency = providers.Factory(ProcessedEventStore, session=session)
+    cart_repo = providers.Factory(SqlAlchemyCartRepository, session=session)
+    product_repo = providers.Factory(SqlAlchemyProductRepository, session=session)
 
     create_order = providers.Factory(
         CreateOrder,
@@ -73,6 +81,8 @@ class CheckoutContainer(containers.DeclarativeContainer):
         authorize_payment=authorize_payment,
         process_payment_failure=process_payment_failure,
         notifier=notifier,
+        cart_repo=cart_repo,
+        product_repo=product_repo,
     )
 
 

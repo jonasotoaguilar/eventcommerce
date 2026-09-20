@@ -22,7 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.checkout.api.container import checkout_container
 from app.modules.checkout.api.schemas import CheckoutRequest, VISIBLE_ASCII_PATTERN
 from app.modules.checkout.application.checkout import Checkout, CheckoutResult
-from app.modules.checkout.application.errors import IdempotencyConflictError
+from app.modules.checkout.application.errors import (
+    CartCurrencyMismatchError,
+    CartNotFoundError,
+    CartTotalExceededError,
+    EmptyCartError,
+    IdempotencyConflictError,
+)
 from app.modules.checkout.application.helpers import hash_key
 from app.modules.iam.api.dependencies import get_current_user
 from app.modules.iam.application.tokens import CurrentUser
@@ -91,6 +97,14 @@ async def create_checkout(
         result: CheckoutResult = await use_case.execute(request)
     except IdempotencyConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except CartNotFoundError as exc:
+        # Abandon a NEW idempotency claim (if any) so a retry with a
+        # valid cart can claim fresh; a CONFLICT path wrote nothing.
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (EmptyCartError, CartCurrencyMismatchError, CartTotalExceededError) as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
         logger.exception("checkout_rolled_back key_hash=%s", key_hash)
         await session.rollback()

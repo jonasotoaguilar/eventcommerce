@@ -11,7 +11,7 @@ where the PK/unique constraints still keep state safe).
 
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,13 @@ class SqlAlchemyCartRepository(CartRepository):
     async def get_by_customer(self, customer_id: UUID) -> Cart | None:
         result = await self._session.execute(
             select(CartModel).where(CartModel.customer_id == customer_id)
+        )
+        orm = result.scalar_one_or_none()
+        return self._to_domain(orm) if orm is not None else None
+
+    async def get_by_id(self, cart_id: UUID) -> Cart | None:
+        result = await self._session.execute(
+            select(CartModel).where(CartModel.id == cart_id)
         )
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm is not None else None
@@ -129,6 +136,12 @@ class SqlAlchemyCartRepository(CartRepository):
         await self._session.delete(orm)
         await self._session.flush()
         return True
+
+    async def clear_lines(self, cart_id: UUID) -> None:
+        await self._session.execute(
+            delete(CartItemModel).where(CartItemModel.cart_id == cart_id)
+        )
+        await self._session.flush()
 
     def _to_domain(self, orm: CartModel) -> Cart:
         return Cart(
