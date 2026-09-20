@@ -40,3 +40,60 @@ class InventoryRejected(DomainEvent):
     @property
     def order_id(self) -> UUID:
         return self.aggregate_id
+
+
+@dataclass(frozen=True)
+class OrderInventoryReserved(DomainEvent):
+    """Internal order-owned event staging payment authorization.
+
+    Emitted through the outbox after the order has durably moved to
+    ``inventory_reserved``. The payments consumer authorizes against
+    authoritative catalog totals only when it observes this event, so
+    payment authorization can never race the order-state transition.
+    """
+
+    status: str = "inventory_reserved"
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id
+
+
+@dataclass(frozen=True)
+class PaymentAuthorized(DomainEvent):
+    """Event emitted when payment is successfully authorized for an order."""
+
+    result: str = "authorized"
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id
+
+
+@dataclass(frozen=True)
+class OrderPaymentAuthorized(DomainEvent):
+    """Internal order-owned event staging confirmation.
+
+    Emitted through the outbox after the order has durably moved to
+    ``payment_authorized``. The orders finalizer confirms only when it
+    observes this event, so confirmation can never race the order-state
+    transition.
+    """
+
+    status: str = "payment_authorized"
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id
+
+
+@dataclass(frozen=True)
+class PaymentRejected(DomainEvent):
+    """Event emitted when payment authorization fails for an order."""
+
+    result: str = "rejected"
+    reason: str = ""
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id

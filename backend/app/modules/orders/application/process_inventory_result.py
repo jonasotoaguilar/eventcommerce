@@ -39,7 +39,18 @@ class ProcessOrderInventoryResult:
             return
 
         if result == "reserved":
-            order.confirm()
+            # U2 async choreography: the reserved path stages the order in
+            # ``inventory_reserved`` and emits the order-owned internal
+            # ``OrderInventoryReserved`` event. Payment authorization listens
+            # on that internal event, so it can never race this transition.
+            # A repeated delivery for an already-staged order is a no-op
+            # beyond the idempotency claim (no duplicate outbox emission).
+            if order.status == "inventory_reserved":
+                await self._idempotency.mark_processed(
+                    event_id, "ProcessOrderInventoryResult"
+                )
+                return
+            order.reserve_inventory()
             await self._order_repo.save(order)
             await self._event_repo.add(
                 event_id=uuid4(),
@@ -50,9 +61,9 @@ class ProcessOrderInventoryResult:
                 payload={"result": "reserved"},
             )
             await self._outbox.save(
-                event_type="OrderConfirmed",
+                event_type="OrderInventoryReserved",
                 aggregate_id=str(order.id),
-                payload={"status": "confirmed"},
+                payload={"status": "inventory_reserved"},
             )
         elif result == "rejected":
             order.cancel(reason="insufficient_stock")

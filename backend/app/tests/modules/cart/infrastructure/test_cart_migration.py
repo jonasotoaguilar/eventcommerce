@@ -49,7 +49,10 @@ class TestCartMigrationChain:
 
         downstreams = set(revisions.values())
         heads = [rev for rev in revisions if rev not in downstreams]
-        assert heads == ["e3f4a5b6c7d8"]
+        # U1 (expand-order-state-machine) appended the five-state order
+        # lifecycle revision f4a5b6c7d8e9 chained after the cart head, so
+        # the linear head moved from e3f4a5b6c7d8 to f4a5b6c7d8e9.
+        assert heads == ["f4a5b6c7d8e9"]
 
 
 class TestCartTablesRegistered:

@@ -19,7 +19,9 @@ from app.shared.messaging.outbox_repository import SqlAlchemyOutboxRepository
 
 class TestProcessOrderInventoryResult:
     @pytest.mark.asyncio
-    async def test_confirms_order_on_inventory_reserved(self, db_session) -> None:
+    async def test_stages_inventory_reserved_on_inventory_reserved(
+        self, db_session
+    ) -> None:
         order_repo = SqlAlchemyOrderRepository(db_session)
         event_repo = SqlAlchemyEventRepository(db_session)
         outbox_repo = SqlAlchemyOutboxRepository(db_session)
@@ -47,10 +49,14 @@ class TestProcessOrderInventoryResult:
 
         found = await order_repo.get_by_id(order.id)
         assert found is not None
-        assert found.status == "confirmed"
+        assert found.status == "inventory_reserved"
 
         pending = await outbox_repo.get_pending(limit=10)
-        assert any(e.event_type == "OrderConfirmed" for e in pending)
+        staged = [e for e in pending if e.event_type == "OrderInventoryReserved"]
+        assert len(staged) == 1
+        assert staged[0].aggregate_id == str(order.id)
+        assert staged[0].payload == {"status": "inventory_reserved"}
+        assert not any(e.event_type == "OrderConfirmed" for e in pending)
 
         timeline = await event_repo.get_timeline(
             aggregate_type="order", aggregate_id=str(order.id)
@@ -136,10 +142,61 @@ class TestProcessOrderInventoryResult:
 
         found = await order_repo.get_by_id(order.id)
         assert found is not None
-        assert found.status == "confirmed"
+        assert found.status == "inventory_reserved"
 
         pending = await outbox_repo.get_pending(limit=10)
-        assert sum(1 for e in pending if e.event_type == "OrderConfirmed") == 1
+        assert sum(1 for e in pending if e.event_type == "OrderInventoryReserved") == 1
+
+        timeline = await event_repo.get_timeline(
+            aggregate_type="order", aggregate_id=str(order.id)
+        )
+        assert sum(1 for e in timeline if e.event_type == "InventoryReserved") == 1
+
+    @pytest.mark.asyncio
+    async def test_restage_with_new_event_id_is_state_idempotent(
+        self, db_session
+    ) -> None:
+        order_repo = SqlAlchemyOrderRepository(db_session)
+        event_repo = SqlAlchemyEventRepository(db_session)
+        outbox_repo = SqlAlchemyOutboxRepository(db_session)
+        idempotency = ProcessedEventStore(db_session)
+        use_case = ProcessOrderInventoryResult(
+            order_repo, event_repo, outbox_repo, idempotency
+        )
+
+        order = Order(
+            id=uuid4(),
+            customer_id="cus_1",
+            status="pending",
+            cancel_reason=None,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+            items=[OrderItem(product_id="prod_1", quantity=1)],
+        )
+        await order_repo.save(order)
+
+        await use_case.execute(
+            event_id=str(uuid4()),
+            order_id=order.id,
+            result="reserved",
+        )
+        await db_session.commit()
+
+        # A redelivery under a fresh event id must not duplicate the
+        # order-owned internal event; the state already reflects it.
+        await use_case.execute(
+            event_id=str(uuid4()),
+            order_id=order.id,
+            result="reserved",
+        )
+        await db_session.commit()
+
+        found = await order_repo.get_by_id(order.id)
+        assert found is not None
+        assert found.status == "inventory_reserved"
+
+        pending = await outbox_repo.get_pending(limit=10)
+        assert sum(1 for e in pending if e.event_type == "OrderInventoryReserved") == 1
 
         timeline = await event_repo.get_timeline(
             aggregate_type="order", aggregate_id=str(order.id)

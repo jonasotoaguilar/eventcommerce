@@ -38,8 +38,18 @@ class OrdersContainer(containers.DeclarativeContainer):
     )
     get_order = providers.Factory(GetOrder, repository=order_repo)
     get_order_timeline = providers.Factory(GetOrderTimeline, event_repo=event_repo)
-    confirm_order = providers.Factory(ConfirmOrder, repository=order_repo)
-    cancel_order = providers.Factory(CancelOrder, repository=order_repo)
+    confirm_order = providers.Factory(
+        ConfirmOrder,
+        repository=order_repo,
+        event_repo=event_repo,
+        outbox=outbox_repo,
+    )
+    cancel_order = providers.Factory(
+        CancelOrder,
+        repository=order_repo,
+        event_repo=event_repo,
+        outbox=outbox_repo,
+    )
     get_order_status = providers.Factory(
         GetOrderStatus,
         order_repository=order_repo,

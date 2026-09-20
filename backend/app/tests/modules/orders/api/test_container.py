@@ -59,6 +59,23 @@ def test_orders_container_wires_confirm_and_cancel_to_the_request_session() -> N
     assert cast(SqlAlchemyOrderRepository, cancel_order._repository)._session is session
 
 
+def test_orders_container_wires_confirm_and_cancel_events_to_the_session() -> None:
+    """U4: operator use cases share the request session for timeline+outbox."""
+    session = _FakeSession()
+    orders_container.session.override(session)
+    try:
+        confirm_order = orders_container.confirm_order()
+        cancel_order = orders_container.cancel_order()
+    finally:
+        orders_container.session.reset_override()
+
+    for use_case in (confirm_order, cancel_order):
+        assert (
+            cast(SqlAlchemyEventRepository, use_case._event_repo)._session is session  # type: ignore[attr-defined]
+        )
+        assert use_case._outbox._session is session  # type: ignore[attr-defined]
+
+
 def test_orders_container_wires_process_order_inventory_result_to_the_session() -> None:
     session = _FakeSession()
     orders_container.session.override(session)

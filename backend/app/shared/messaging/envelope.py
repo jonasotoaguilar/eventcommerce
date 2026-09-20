@@ -13,6 +13,10 @@ class EventEnvelope(BaseModel):
         "OrderCreated",
         "InventoryReserved",
         "InventoryRejected",
+        "OrderInventoryReserved",
+        "PaymentAuthorized",
+        "PaymentRejected",
+        "OrderPaymentAuthorized",
         "OrderConfirmed",
         "OrderCancelled",
     ]
