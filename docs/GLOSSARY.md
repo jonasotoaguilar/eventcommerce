@@ -72,7 +72,7 @@ Order statuses are `pending`, `inventory_reserved`, `payment_authorized`, `confi
 | `pending` | `pending` | Yes | Idempotent self-transition. |
 | `pending` | `inventory_reserved` | Yes | Reached by the event-driven inventory result. |
 | `pending` | `confirmed` | Yes | Synchronous checkout compatibility shortcut only. |
-| `pending` | `cancelled` | Yes | Reached when stock is rejected, payment is rejected, or an operator cancels. |
+| `pending` | `cancelled` | Yes | Reached when stock is rejected or an operator cancels; payment rejection is handled from `inventory_reserved`. |
 | `inventory_reserved` | `inventory_reserved` | Yes | Idempotent self-transition. |
 | `inventory_reserved` | `payment_authorized` | Yes | Reached by the event-driven payment result. |
 | `inventory_reserved` | `cancelled` | Yes | Payment rejection or operator cancel. |
@@ -84,7 +84,7 @@ Order statuses are `pending`, `inventory_reserved`, `payment_authorized`, `confi
 | `confirmed` | any other | No | Terminal state. |
 | `cancelled` | any other | No | Terminal state. |
 
-MVP Target adds the intermediate states: `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`, with cancellation allowed from any non-terminal state.
+The five-state lifecycle is delivered: `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`, with cancellation allowed from each non-terminal state per the table above.
 
 ## Maintenance
 
