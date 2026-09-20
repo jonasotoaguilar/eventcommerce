@@ -166,3 +166,57 @@ def test_containers():
         is s
     )  # type: ignore
     notifications_container.session.reset_override()
+
+
+def test_cart_container_wires_use_cases_to_the_request_session():
+    from app.modules.cart.api.container import cart_container
+    from app.modules.cart.application.add_item import AddCartItem
+    from app.modules.cart.application.get_cart import GetCart
+    from app.modules.cart.application.remove_item import RemoveCartItem
+    from app.modules.cart.application.set_item_quantity import SetCartItemQuantity
+
+    s = _FakeSession()  # type: ignore
+    cart_container.session.override(s)
+    try:
+        get = cart_container.get_cart()
+        add = cart_container.add_item()
+        setter = cart_container.set_quantity()
+        remove = cart_container.remove_item()
+    finally:
+        cart_container.session.reset_override()
+    assert isinstance(get, GetCart)
+    assert isinstance(add, AddCartItem)
+    assert isinstance(setter, SetCartItemQuantity)
+    assert isinstance(remove, RemoveCartItem)
+    for use_case in (get, add, setter, remove):
+        assert use_case._carts._session is s  # type: ignore
+        assert use_case._products._session is s  # type: ignore
+
+
+def test_cart_routes_registered():
+    from app.app import create_app
+
+    app = create_app()
+    found = {
+        (getattr(r, "path", ""), method)
+        for r in app.routes
+        for method in (sorted(getattr(r, "methods", set()) or []))
+    }
+    assert ("/api/v1/cart", "GET") in found
+    assert ("/api/v1/cart/items", "POST") in found
+    assert ("/api/v1/cart/items/{product_id}", "PATCH") in found
+    assert ("/api/v1/cart/items/{product_id}", "DELETE") in found
+
+
+def test_checkout_container_wires_cart_and_catalog_repos_to_the_request_session():
+    from app.modules.checkout.api.container import checkout_container
+
+    s = _FakeSession()  # type: ignore
+    checkout_container.session.override(s)
+    try:
+        checkout = checkout_container.checkout()
+    finally:
+        checkout_container.session.reset_override()
+    assert checkout._cart_repo._session is s  # type: ignore
+    assert checkout._product_repo._session is s  # type: ignore
+    assert checkout._session is s

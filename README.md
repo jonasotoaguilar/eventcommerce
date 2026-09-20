@@ -6,7 +6,7 @@ A product-quality portfolio project: a modular, event-driven commerce backend th
 
 ### Now
 
-- Modular Python backend in `backend/app/` with `orders`, `inventory`, `payments`, `notifications`, and `checkout` bounded contexts, wired through `dependency-injector` per-module containers.
+- Modular Python backend in `backend/app/` with `orders`, `inventory`, `payments`, `notifications`, `checkout`, `iam`, `catalog`, and `cart` bounded contexts, wired through `dependency-injector` per-module containers.
 - Orders HTTP API: `POST /api/v1/orders`, `GET /api/v1/orders/{order_id}`, and `GET /api/v1/orders/{order_id}/timeline`.
 - Synchronous checkout at `POST /api/v1/checkout`: creates the order, locks and reserves inventory (row-level `FOR UPDATE`), authorizes payment with a deterministic simulated policy (ADR 0005), and reaches `confirmed` or `cancelled` in one request.
 - Durable idempotency and response cache: `Idempotency-Key` claims with replay detection and `409` on payload mismatch, backed by the `processed_events` table.
@@ -15,14 +15,16 @@ A product-quality portfolio project: a modular, event-driven commerce backend th
 - Messaging runtime wired into the app lifespan (`backend/app/messaging_runtime.py` + `backend/app/app.py`): outbox scheduler (composite `(status, created_at)` index, `FOR UPDATE SKIP LOCKED` claims), RabbitMQ publisher (persistent delivery, headers, never logs payloads), and AMQP consumer (durable `order.events` TOPIC exchange, three queues, prefetch 1) with idempotent handlers — `OrderCreated` → inventory reservation, `InventoryReserved`/`InventoryRejected` → order confirmation/cancellation, terminal events → notifications.
 - Chain proof without a broker in the default suite (`backend/app/tests/runtime/test_chain_e2e.py`); real-broker proof gated behind `EVENTCOMMERCE_RUN_RABBITMQ_INTEGRATION=1` (`backend/app/tests/integration/test_rabbitmq_integration.py`, rabbitmq service in CI). Live broker delivery requires RabbitMQ. No production deployment or operations claim.
 - IAM bounded context (`backend/app/modules/iam/`): `POST /api/v1/iam/register` (shopper-only, `201`/`409`), `POST /api/v1/iam/login` (30-minute HS256 access JWT, generic `401`), and `GET /api/v1/iam/me` (bearer, `200`/`401`); commerce routes enforce owner-or-operator access from the JWT subject.
-- **Not yet**: catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
+- Catalog bounded context (`backend/app/modules/catalog/`): public `GET /api/v1/catalog` (active-only browse) and `GET /api/v1/catalog/{product_id}` (detail; missing and inactive share one `404`), plus operator `POST /api/v1/catalog` / `PATCH /api/v1/catalog/{product_id}` product management. Catalog creation seeds an inventory row at zero stock; operators adjust stock via `POST /api/v1/inventory/{product_id}/adjust`.
+- Cart bounded context (`backend/app/modules/cart/`): `GET /api/v1/cart` (lazily created), `POST /api/v1/cart/items`, `PATCH` / `DELETE /api/v1/cart/items/{product_id}` — one persisted cart per authenticated shopper, owner-scoped by the JWT subject, with live subtotal from active catalog prices. Checkout accepts an optional `cart_id` and derives lines, amount, and currency from authoritative catalog pricing; the inline `{items, amount, currency}` shape remains supported.
+- **Not yet**: the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
 
 ### MVP Target
 
 The remaining commerce journey on a single event-driven backend:
 
-- Catalog and cart contexts for product browsing and purchase collection.
-- Live event choreography is wired (see Now above); remaining work is catalog/cart, the five-state lifecycle, and confirm/cancel routes.
+- Storefront UI over the delivered catalog/cart/checkout backend (browse, cart, checkout form, order tracking).
+- Live event choreography is wired (see Now above); remaining work is the five-state lifecycle and confirm/cancel routes.
 - The full five-state order lifecycle (`pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`) and confirm/cancel HTTP routes.
 
 ### Future

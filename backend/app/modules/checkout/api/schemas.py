@@ -1,17 +1,21 @@
 """Checkout API schemas (design.md API and Data Contracts).
 
-CheckoutRequest carries customer/product IDs 1-128 chars, 1-100 unique
-items, quantity 1-10,000, a Decimal amount 0-999,999,999.99 with at most
-two decimals, a currency normalized then validated syntactically as exactly
-three uppercase ASCII letters (syntactic ISO 4217 — this does NOT prove a
-currency exists; catalog/reconciliation is deferred), and an optional
-visible-ASCII Idempotency-Key 1-128 chars. CheckoutResponse carries
-order_id, status, nullable cancel_reason, and nullable payment_status.
+CheckoutRequest carries either the legacy inline shape (``items``,
+``amount``, ``currency``) or a ``cart_id`` alone: cart-backed checkout
+derives unique order lines and the authoritative Decimal amount from
+live catalog prices and never trusts a caller-sent amount/currency.
+Mixing ``cart_id`` with any inline field is a 422. ``customer_id`` is
+accepted for compatibility but ignored: the authenticated JWT subject
+is authoritative for ownership (U5). The optional visible-ASCII
+Idempotency-Key (1-128 chars) keeps its existing behavior on both
+shapes. CheckoutResponse carries order_id, status, nullable
+cancel_reason, and nullable payment_status.
 """
 
 import re
 from decimal import Decimal
 from typing import Self
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -32,19 +36,26 @@ class CheckoutItemRequest(BaseModel):
 class CheckoutRequest(BaseModel):
     """Validated body of ``POST /api/v1/checkout``.
 
-    ``customer_id`` is accepted for compatibility but ignored: the
-    authenticated JWT subject is authoritative for ownership (U5).
+    Either the legacy inline shape (``items`` + ``amount`` + ``currency``)
+    or ``cart_id`` alone. ``customer_id`` is accepted for compatibility
+    but ignored: the authenticated JWT subject is authoritative for
+    ownership (U5).
     """
 
     customer_id: str | None = Field(default=None, min_length=1, max_length=128)
-    items: list[CheckoutItemRequest] = Field(min_length=1, max_length=MAX_ITEMS)
-    amount: Decimal = Field(ge=Decimal("0"), le=MAX_AMOUNT)
-    currency: str
+    cart_id: UUID | None = None
+    items: list[CheckoutItemRequest] | None = Field(
+        default=None, min_length=1, max_length=MAX_ITEMS
+    )
+    amount: Decimal | None = Field(default=None, ge=Decimal("0"), le=MAX_AMOUNT)
+    currency: str | None = None
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=128)
 
     @field_validator("currency")
     @classmethod
-    def _normalize_and_validate_currency(cls, value: str) -> str:
+    def _normalize_and_validate_currency(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         normalized = value.upper()
         if CURRENCY_PATTERN.fullmatch(normalized) is None:
             raise ValueError("currency must be exactly three uppercase ASCII letters")
@@ -52,7 +63,9 @@ class CheckoutRequest(BaseModel):
 
     @field_validator("amount")
     @classmethod
-    def _at_most_two_decimal_places(cls, value: Decimal) -> Decimal:
+    def _at_most_two_decimal_places(cls, value: Decimal | None) -> Decimal | None:
+        if value is None:
+            return None
         exponent = value.as_tuple().exponent
         if isinstance(exponent, int) and exponent < -2:
             raise ValueError("amount must have at most two decimal places")
@@ -66,7 +79,21 @@ class CheckoutRequest(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _items_are_unique(self) -> Self:
+    def _shape_and_items_are_valid(self) -> Self:
+        if self.cart_id is not None:
+            if (
+                self.items is not None
+                or self.amount is not None
+                or self.currency is not None
+            ):
+                raise ValueError(
+                    "cart_id cannot be combined with items, amount, or currency"
+                )
+            return self
+        if self.items is None or self.amount is None or self.currency is None:
+            raise ValueError(
+                "items, amount, and currency are required when cart_id is absent"
+            )
         product_ids = [item.product_id for item in self.items]
         if len(product_ids) != len(set(product_ids)):
             raise ValueError("items must contain unique product_ids")

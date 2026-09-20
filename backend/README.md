@@ -42,6 +42,12 @@ app/
       application/
       domain/
       infrastructure/
+    iam/
+      api/            — routes.py, schemas.py, container.py
+    catalog/
+      api/            — routes.py, schemas.py, container.py
+    cart/
+      api/            — routes.py, schemas.py, container.py
     checkout/
       api/
       application/

@@ -7,3 +7,7 @@ class InventoryDomainError(Exception):
 
 class InsufficientStockError(InventoryDomainError):
     """Raised when there is not enough stock."""
+
+
+class InventoryNotFoundError(InventoryDomainError):
+    """Raised when no inventory row exists for a product."""

@@ -24,17 +24,20 @@ from collections.abc import AsyncIterator, Generator
 from decimal import Decimal
 from typing import Any
 from unittest.mock import patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.app import create_app
 from app.modules.iam.api.dependencies import get_current_user
 from app.modules.iam.application.tokens import CurrentUser
+from app.modules.cart.infrastructure.models import CartItemModel, CartModel  # noqa: F401
+from app.modules.catalog.infrastructure.models import ProductModel  # noqa: F401
+from app.modules.iam.infrastructure.models import UserModel  # noqa: F401
 from app.modules.inventory.domain.entities import Inventory
 from app.modules.inventory.infrastructure.sqlalchemy_repository import (
     SqlAlchemyInventoryRepository,
@@ -355,3 +358,339 @@ class TestNotificationIntentAndFailure:
             "checkout_notification_failed" in record.message
             for record in caplog.records
         )
+
+
+E2E_SHOPPER = UUID("11111111-1111-1111-1111-111111111111")
+E2E_OTHER = UUID("22222222-2222-2222-2222-222222222222")
+
+
+async def _seed_cart_user(db_session: AsyncSession, user_id: UUID) -> None:
+    db_session.add(
+        UserModel(
+            id=user_id,
+            email=f"{user_id}@example.com",
+            password_hash="x",
+            role="shopper",
+        )
+    )
+    await db_session.commit()
+
+
+async def _seed_catalog_product(
+    db_session: AsyncSession,
+    product_id: str,
+    price: str,
+    currency: str = "USD",
+    active: bool = True,
+    stock: int = 10,
+) -> None:
+    db_session.add(
+        ProductModel(
+            id=product_id,
+            name=f"Product {product_id}",
+            description=None,
+            price=Decimal(price),
+            currency=currency,
+            active=active,
+        )
+    )
+    await db_session.flush()
+    repo = SqlAlchemyInventoryRepository(db_session)
+    await repo.save(
+        Inventory(
+            product_id=product_id,
+            available_quantity=stock,
+            reserved_quantity=0,
+        )
+    )
+    await db_session.commit()
+
+
+async def _seed_cart_line(
+    db_session: AsyncSession, owner: UUID, product_id: str, quantity: int
+) -> UUID:
+    from app.modules.cart.infrastructure.sqlalchemy_repository import (
+        SqlAlchemyCartRepository,
+    )
+    from app.modules.cart.domain.entities import CartLine
+
+    carts = SqlAlchemyCartRepository(db_session)
+    cart = await carts.get_or_create(owner)
+    await carts.save_line(
+        CartLine(cart_id=cart.id, product_id=product_id, quantity=quantity)
+    )
+    await db_session.commit()
+    return cart.id
+
+
+async def _cart_id(client: httpx.AsyncClient) -> UUID:
+    response = await client.get("/api/v1/cart")
+    assert response.status_code == 200, response.text
+    return UUID(response.json()["cart_id"])
+
+
+class TestCartShapeRejected:
+    @pytest.mark.asyncio
+    async def test_mixing_cart_id_with_inline_fields_returns_422(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "19.99")
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "P1", 1)
+
+        for extra in (
+            {"items": [{"product_id": "P1", "quantity": 1}]},
+            {"amount": "19.99"},
+            {"currency": "USD"},
+        ):
+            response = await client.post(
+                CHECKOUT_URL, json={"cart_id": str(cart_id), **extra}
+            )
+            assert response.status_code == 422, extra
+            assert set(response.json()) == {"detail"}
+
+        assert await _count(db_session, OrderModel) == 0
+
+
+class TestCartCheckoutE2E:
+    @pytest.mark.asyncio
+    async def test_cart_checkout_derives_amount_and_clears_cart(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "10.00", stock=10)
+        await _seed_catalog_product(db_session, "P2", "5.00", stock=10)
+
+        assert (
+            await client.post(
+                "/api/v1/cart/items", json={"product_id": "P1", "quantity": 2}
+            )
+        ).status_code == 200
+        assert (
+            await client.post(
+                "/api/v1/cart/items", json={"product_id": "P2", "quantity": 1}
+            )
+        ).status_code == 200
+        cart = (await client.get("/api/v1/cart")).json()
+        assert cart["subtotal"] == "25.00"
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": cart["cart_id"]})
+
+        assert response.status_code == 201, response.text
+        assert response.json()["status"] == "confirmed"
+        payments = (await db_session.execute(select(PaymentModel))).scalars().all()
+        assert len(payments) == 1
+        assert payments[0].amount == Decimal("25.00")
+        assert payments[0].currency == "USD"
+        cleared = (await client.get("/api/v1/cart")).json()
+        assert cleared["items"] == []
+        assert cleared["subtotal"] == "0.00"
+        assert await _count(db_session, OrderModel) == 1
+
+    @pytest.mark.asyncio
+    async def test_cart_checkout_uses_live_catalog_price(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "10.00", stock=10)
+        assert (
+            await client.post(
+                "/api/v1/cart/items", json={"product_id": "P1", "quantity": 2}
+            )
+        ).status_code == 200
+
+        await db_session.execute(
+            update(ProductModel)
+            .where(ProductModel.id == "P1")
+            .values(price=Decimal("14.50"))
+        )
+        await db_session.commit()
+        cart_id = await _cart_id(client)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 201, response.text
+        payments = (await db_session.execute(select(PaymentModel))).scalars().all()
+        assert len(payments) == 1
+        assert payments[0].amount == Decimal("29.00")
+
+    @pytest.mark.asyncio
+    async def test_missing_cart_returns_404(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(uuid4())})
+
+        assert response.status_code == 404
+        assert response.json() == {"detail": "Cart not found"}
+        assert await _count(db_session, OrderModel) == 0
+
+    @pytest.mark.asyncio
+    async def test_other_owners_cart_returns_404(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_cart_user(db_session, E2E_OTHER)
+        await _seed_catalog_product(db_session, "P1", "10.00", stock=10)
+        other_cart = await _seed_cart_line(db_session, E2E_OTHER, "P1", 1)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(other_cart)})
+
+        assert response.status_code == 404
+        assert response.json() == {"detail": "Cart not found"}
+        assert await _count(db_session, OrderModel) == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_cart_returns_422(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        cart_id = await _cart_id(client)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 422
+        assert response.json() == {"detail": "Cart is empty"}
+        assert await _count(db_session, OrderModel) == 0
+
+    @pytest.mark.asyncio
+    async def test_fully_inactive_cart_returns_422(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "10.00", active=False, stock=10)
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "P1", 1)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 422
+        assert response.json() == {"detail": "Cart is empty"}
+        assert await _count(db_session, OrderModel) == 0
+
+    @pytest.mark.asyncio
+    async def test_mixed_currency_cart_returns_422(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "USD-ITEM", "10.00", "USD", stock=10)
+        await _seed_catalog_product(db_session, "EUR-ITEM", "8.00", "EUR", stock=10)
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "USD-ITEM", 1)
+        await _seed_cart_line(db_session, E2E_SHOPPER, "EUR-ITEM", 1)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 422
+        assert set(response.json()) == {"detail"}
+        assert await _count(db_session, OrderModel) == 0
+
+
+class TestCartClearRetainE2E:
+    @pytest.mark.asyncio
+    async def test_confirmed_checkout_clears_but_stock_cancel_retains(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "10.00", stock=1)
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "P1", 2)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 201
+        assert response.json()["status"] == "cancelled"
+        assert response.json()["cancel_reason"] == "insufficient_stock"
+        retained = (await client.get("/api/v1/cart")).json()
+        assert [(i["product_id"], i["quantity"]) for i in retained["items"]] == [
+            ("P1", 2)
+        ]
+
+    @pytest.mark.asyncio
+    async def test_payment_decline_retains_cart(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "199.99", stock=10)
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "P1", 1)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 201
+        assert response.json()["status"] == "cancelled"
+        assert response.json()["cancel_reason"] == "payment_declined"
+        retained = (await client.get("/api/v1/cart")).json()
+        assert [(i["product_id"], i["quantity"]) for i in retained["items"]] == [
+            ("P1", 1)
+        ]
+
+
+class TestCartIdempotencyE2E:
+    @pytest.mark.asyncio
+    async def test_replay_after_clear_returns_cached_without_second_order(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "10.00", stock=10)
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "P1", 2)
+        headers = {"Idempotency-Key": "cart-e2e-replay-1"}
+
+        first = await client.post(
+            CHECKOUT_URL, json={"cart_id": str(cart_id)}, headers=headers
+        )
+        assert first.status_code == 201, first.text
+        assert (await client.get("/api/v1/cart")).json()["items"] == []
+
+        second = await client.post(
+            CHECKOUT_URL, json={"cart_id": str(cart_id)}, headers=headers
+        )
+
+        assert second.status_code == 201
+        assert second.json() == first.json()
+        assert await _count(db_session, OrderModel) == 1
+        assert await _count(db_session, PaymentModel) == 1
+
+
+class TestCartTotalCapE2E:
+    @pytest.mark.asyncio
+    async def test_over_limit_derived_total_returns_422(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "600000000.00", stock=10)
+        cart_id = await _seed_cart_line(db_session, E2E_SHOPPER, "P1", 2)
+
+        response = await client.post(CHECKOUT_URL, json={"cart_id": str(cart_id)})
+
+        assert response.status_code == 422
+        assert response.json() == {"detail": "Cart total exceeds maximum amount"}
+        assert await _count(db_session, OrderModel) == 0
+
+
+class TestClaimReuseAfterInvalidE2E:
+    @pytest.mark.asyncio
+    async def test_empty_then_filled_cart_reuses_same_key(
+        self, client, db_session, deterministic_payments
+    ) -> None:
+        await _seed_cart_user(db_session, E2E_SHOPPER)
+        await _seed_catalog_product(db_session, "P1", "10.00", stock=10)
+        cart_id = await _cart_id(client)
+        headers = {"Idempotency-Key": "cart-e2e-reuse-after-invalid-1"}
+
+        rejected = await client.post(
+            CHECKOUT_URL, json={"cart_id": str(cart_id)}, headers=headers
+        )
+        assert rejected.status_code == 422
+        assert rejected.json() == {"detail": "Cart is empty"}
+
+        assert (
+            await client.post(
+                "/api/v1/cart/items", json={"product_id": "P1", "quantity": 1}
+            )
+        ).status_code == 200
+
+        retried = await client.post(
+            CHECKOUT_URL, json={"cart_id": str(cart_id)}, headers=headers
+        )
+
+        assert retried.status_code == 201, retried.text
+        assert retried.json()["status"] == "confirmed"
+        assert await _count(db_session, OrderModel) == 1

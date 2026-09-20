@@ -12,6 +12,12 @@ import pytest
 from dependency_injector import errors
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.cart.infrastructure.sqlalchemy_repository import (
+    SqlAlchemyCartRepository,
+)
+from app.modules.catalog.infrastructure.sqlalchemy_repository import (
+    SqlAlchemyProductRepository,
+)
 from app.modules.checkout.api.container import checkout_container
 from app.modules.checkout.application.checkout import Checkout
 from app.modules.inventory.infrastructure.sqlalchemy_repository import (
@@ -89,6 +95,8 @@ def test_checkout_container_wires_every_dependency_to_the_request_session() -> N
         cast(SqlAlchemyNotificationRepository, checkout._notifier._repository)._session
         is session
     )
+    assert cast(SqlAlchemyCartRepository, checkout._cart_repo)._session is session
+    assert cast(SqlAlchemyProductRepository, checkout._product_repo)._session is session
 
 
 def test_checkout_container_resolves_fresh_instances_per_request() -> None:

@@ -29,16 +29,15 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 **Current contexts** (`backend/app/modules/`):
 
 - `orders` — order lifecycle and state machine.
-- `checkout` — synchronous commerce orchestrator (`POST /api/v1/checkout`).
-- `inventory` — stock reservation and release with row-level locking.
+- `checkout` — synchronous commerce orchestrator (`POST /api/v1/checkout`; inline items or `cart_id` with catalog-derived pricing).
+- `inventory` — stock reservation and release with row-level locking; operator stock adjustment.
 - `payments` — authorization and failure handling behind a deterministic policy.
 - `notifications` — best-effort notification intent.
+- `iam` — JWT authentication and role authorization.
+- `catalog` — product browsing (public active-only) and operator product management; creation seeds the inventory row.
+- `cart` — one persisted cart per authenticated shopper with live subtotal from catalog prices.
 
-**Target contexts** (MVP):
-
-- `iam` — owned JWT authentication and role authorization.
-- `catalog` — product browsing and catalog management.
-- `cart` — purchase collection before checkout.
+**Target contexts** (MVP): no new bounded contexts remain; remaining work extends `orders` toward the five-state lifecycle.
 
 ## Events
 

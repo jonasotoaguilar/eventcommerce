@@ -46,6 +46,7 @@ class TestValidRequestPassThrough:
     def test_full_valid_request_parses(self) -> None:
         request = CheckoutRequest.model_validate(VALID_PAYLOAD)
         assert request.customer_id == "cust-123"
+        assert request.items is not None
         assert [(i.product_id, i.quantity) for i in request.items] == [
             ("P1", 2),
             ("P2", 1),
@@ -73,6 +74,7 @@ class TestValidRequestPassThrough:
             )
         )
         assert request.customer_id == "c" * 128
+        assert request.items is not None
         assert len(request.items) == 100
         assert request.amount == Decimal("999999999.99")
 
@@ -83,6 +85,7 @@ class TestValidRequestPassThrough:
                 amount="0",
             )
         )
+        assert request.items is not None
         assert request.items[0].quantity == 1
         assert request.amount == Decimal("0")
 
@@ -245,3 +248,59 @@ class TestCheckoutResponse:
     def test_response_requires_order_id_and_status(self) -> None:
         with pytest.raises(ValidationError):
             CheckoutResponse.model_validate({"order_id": "ord-3"})
+
+
+class TestCartIdShape:
+    """U3: cart_id alone is valid; mixing with inline fields is a 422."""
+
+    def test_cart_id_alone_validates(self) -> None:
+        request = CheckoutRequest.model_validate(
+            {"cart_id": "11111111-1111-1111-1111-111111111111"}
+        )
+        assert str(request.cart_id) == "11111111-1111-1111-1111-111111111111"
+        assert request.items is None
+        assert request.amount is None
+        assert request.currency is None
+
+    def test_cart_id_with_compat_keys_validates(self) -> None:
+        request = CheckoutRequest.model_validate(
+            {
+                "cart_id": "11111111-1111-1111-1111-111111111111",
+                "customer_id": "compat-id",
+                "idempotency_key": "cart-key-1",
+            }
+        )
+        assert request.customer_id == "compat-id"
+        assert request.idempotency_key == "cart-key-1"
+
+    @pytest.mark.parametrize("field", ["items", "amount", "currency"])
+    def test_cart_id_mixed_with_inline_field_rejected(self, field: str) -> None:
+        payload: dict = {"cart_id": "11111111-1111-1111-1111-111111111111"}
+        payload.update(valid_request())
+        # valid_request carries all inline fields; keep only the mixed one.
+        for other in ("items", "amount", "currency"):
+            if other != field:
+                del payload[other]
+        with pytest.raises(ValidationError):
+            CheckoutRequest.model_validate(payload)
+
+    def test_cart_id_mixed_with_all_inline_fields_rejected(self) -> None:
+        payload = valid_request()
+        payload["cart_id"] = "11111111-1111-1111-1111-111111111111"
+        with pytest.raises(ValidationError):
+            CheckoutRequest.model_validate(payload)
+
+    @pytest.mark.parametrize("field", ["items", "amount", "currency"])
+    def test_inline_missing_field_without_cart_rejected(self, field: str) -> None:
+        payload = valid_request()
+        del payload[field]
+        with pytest.raises(ValidationError):
+            CheckoutRequest.model_validate(payload)
+
+    def test_fully_empty_request_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            CheckoutRequest.model_validate({})
+
+    def test_invalid_cart_id_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            CheckoutRequest.model_validate({"cart_id": "not-a-uuid"})

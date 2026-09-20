@@ -19,6 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.inventory.application.adjust_stock import AdjustStock
 from app.modules.inventory.application.release_inventory import ReleaseInventory
 from app.modules.inventory.domain.entities import Inventory
 from app.modules.inventory.domain.errors import InsufficientStockError
@@ -259,3 +260,87 @@ class TestConcurrentLocking:
                 assert inventory is not None
                 assert inventory.available_quantity == 8
                 assert inventory.reserved_quantity == 2
+
+
+async def _adjust(
+    session_factory: async_sessionmaker[AsyncSession],
+    product_id: str,
+    delta: int,
+    barrier: asyncio.Barrier | None = None,
+) -> None:
+    """AdjustStock flow used by concurrent operators: lock, mutate, commit."""
+    async with session_factory() as session:
+        async with session.begin():
+            if barrier is not None:
+                await barrier.wait()
+            repo = SqlAlchemyInventoryRepository(session)
+            await AdjustStock(repo).execute(product_id, delta)
+
+
+class TestLockByProduct:
+    @pytest.mark.asyncio
+    async def test_returns_locked_row(self, session_factory) -> None:
+        await _seed(session_factory, {"p1": (10, 2)})
+        async with session_factory() as session:
+            async with session.begin():
+                repo = SqlAlchemyInventoryRepository(session)
+                locked = await repo.lock_by_product("p1")
+                assert locked is not None
+                assert locked.available_quantity == 10
+                assert locked.reserved_quantity == 2
+
+    @pytest.mark.asyncio
+    async def test_missing_returns_none(self, session_factory) -> None:
+        async with session_factory() as session:
+            repo = SqlAlchemyInventoryRepository(session)
+            assert await repo.lock_by_product("ghost") is None
+
+    @pytest.mark.asyncio
+    async def test_second_locker_blocks_until_first_commits(
+        self, session_factory
+    ) -> None:
+        """A concurrent adjust must wait on the held row lock."""
+        await _seed(session_factory, {"p1": (10, 0)})
+        s1 = session_factory()
+        async with s1.begin():
+            repo1 = SqlAlchemyInventoryRepository(s1)
+            locked = await repo1.lock_by_product("p1")
+            assert locked is not None
+
+            s2 = session_factory()
+            started = asyncio.Event()
+
+            async def tx2() -> None:
+                async with s2.begin():
+                    started.set()
+                    repo2 = SqlAlchemyInventoryRepository(s2)
+                    result = await repo2.lock_by_product("p1")
+                    assert result is not None
+
+            task = asyncio.create_task(tx2())
+            await started.wait()
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
+
+        await task
+
+
+class TestConcurrentAdjusts:
+    @pytest.mark.asyncio
+    async def test_concurrent_adjusts_do_not_lose_updates(
+        self, session_factory
+    ) -> None:
+        await _seed(session_factory, {"p1": (0, 0)})
+        barrier = asyncio.Barrier(2)
+
+        await asyncio.gather(
+            _adjust(session_factory, "p1", 5, barrier),
+            _adjust(session_factory, "p1", 7, barrier),
+        )
+
+        async with session_factory() as session:
+            repo = SqlAlchemyInventoryRepository(session)
+            inventory = await repo.get_by_product("p1")
+            assert inventory is not None
+            assert inventory.available_quantity == 12
+            assert inventory.reserved_quantity == 0

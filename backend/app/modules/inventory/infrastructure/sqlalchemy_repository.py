@@ -26,6 +26,21 @@ class SqlAlchemyInventoryRepository(InventoryRepository):
             reserved_quantity=orm.reserved_quantity,
         )
 
+    async def lock_by_product(self, product_id: str) -> Inventory | None:
+        result = await self._session.execute(
+            select(InventoryModel)
+            .where(InventoryModel.product_id == product_id)
+            .with_for_update()
+        )
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        return Inventory(
+            product_id=orm.product_id,
+            available_quantity=orm.available_quantity,
+            reserved_quantity=orm.reserved_quantity,
+        )
+
     async def save(self, inventory: Inventory) -> None:
         existing = await self.get_by_product(inventory.product_id)
         if existing is not None:
