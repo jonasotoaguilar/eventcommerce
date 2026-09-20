@@ -125,7 +125,7 @@ components:
 # Design
 
 > **Target Design Notice**
-> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), and orders HTTP APIs, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
+> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), orders HTTP APIs including operator-only confirm/cancel routes, and the delivered five-state event-driven order path, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
 
 ## Overview
 
@@ -143,7 +143,7 @@ This document owns the target screen map, user flows, visual tokens, component s
 | Add to cart | Cart line API (`GET /api/v1/cart`, item add/set/remove); no UI | Cart drawer/page with line items, quantities, and subtotal |
 | Review checkout | Checkout accepts inline items or `cart_id`; no UI | Checkout summary with shipping, payment stub, and place-order CTA |
 | Place order | `POST /api/v1/checkout` (synchronous) | Same commerce path, surfaced through a checkout form |
-| View order status | `GET /api/v1/orders/{id}` | Order tracking page with live status and timeline |
+| View order status | `GET /api/v1/orders/{id}` (+ timeline; five-state statuses reachable via the event path) | Order tracking page with live status and timeline |
 | Receive result | Raw JSON response | In-context success, failure, or pending message |
 
 ### Store operator inventory-and-order journey
@@ -153,7 +153,7 @@ This document owns the target screen map, user flows, visual tokens, component s
 | Review catalog | Catalog product API (operator `POST`/`PATCH`); no UI | Operator catalog list with edit and stock-adjust actions |
 | Adjust stock | `POST /api/v1/inventory/{product_id}/adjust` (operator); no UI | Inline stock editor with confirmation and event log |
 | List orders | Orders HTTP API; no UI | Order queue with filters by status and date |
-| Confirm or cancel | Domain transitions via checkout only; no operator route or UI | Operator action triggers the existing domain transitions |
+| Confirm or cancel | Operator-only `POST /api/v1/orders/{order_id}/confirm` / `POST /api/v1/orders/{order_id}/cancel`; no UI | Operator queue row triggers the delivered operator routes |
 | Inspect payment decision | Read logs/tests | Payment simulation panel showing deterministic result for inputs |
 
 ### Checkout success / failure / pending flow
@@ -173,7 +173,7 @@ flowchart TD
     K --> E
 ```
 
-The current backend resolves checkout synchronously: `POST /api/v1/checkout` returns a terminal `confirmed` or `cancelled` order in one request, so the `Still waiting` / poll path above only applies once event-driven consumption is wired (MVP Target).
+The synchronous `POST /api/v1/checkout` compatibility boundary still returns a terminal `confirmed` or `cancelled` order in one request; the event-driven path separately walks `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`, so the `Still waiting` / poll path above now describes the async order-tracking experience (UI still MVP Target).
 
 ## Screen inventory
 
@@ -243,11 +243,11 @@ Every interactive element and status surface defines at least these states:
 
 Status copy is exact, not friendly-to-a-fault. Use the vocabulary defined in [docs/GLOSSARY.md](./docs/GLOSSARY.md):
 
-- `pending` — order or action submitted, no final result yet.
-- `reserved` — inventory held for the order.
-- `rejected` — inventory or payment could not be satisfied.
+- `pending` — order submitted, no reservation result yet.
+- `inventory_reserved` — inventory held for the order.
+- `payment_authorized` — payment authorized, awaiting confirmation.
 - `confirmed` — order reached a successful terminal state.
-- `cancelled` — order reached a terminal cancelled state.
+- `cancelled` — order reached a terminal cancelled state with a reason.
 
 Never describe an unwired consumer or partial backend flow as if it were live in the UI.
 
@@ -256,7 +256,7 @@ Never describe an unwired consumer or partial backend flow as if it were live in
 - **WCAG target**: WCAG 2.2 Level AA for color contrast, focus visibility, and form error association.
 - **Keyboard / focus**: every interactive element is reachable by Tab; focus order matches visual order; skip link provided on every page.
 - **Semantic structure**: one `h1` per page, headings never skip levels, tables use `th`/`scope`, buttons are not links.
-- **Live status**: regions with `aria-live="polite"` announce async status changes (`pending` → `confirmed`) without stealing focus.
+- **Live status**: regions with `aria-live="polite"` announce async status changes (`pending` → `inventory_reserved` → `payment_authorized` → `confirmed`) without stealing focus.
 - **Reduced motion**: honor `prefers-reduced-motion` by disabling entrance animations and limiting motion to opacity-only transitions.
 - **Forms / errors**: every input has an associated `label`; errors are linked with `aria-describedby`; error text explains how to fix, not just what failed.
 - **Color independence**: status is never communicated by color alone; icons and text accompany every semantic color.
@@ -266,7 +266,7 @@ Never describe an unwired consumer or partial backend flow as if it were live in
 Components are described by responsibility and states, not by framework-specific implementation. Concrete framework choices are deferred to the `add-frontend-mvp` follow-up.
 
 - **Button**: primary, secondary, danger, ghost variants; loading state with `aria-busy`.
-- **StatusBadge**: maps to `pending`, `reserved`, `confirmed`, `cancelled`, `rejected`; includes icon + text.
+- **StatusBadge**: maps to `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`; includes icon + text.
 - **ProductCard**: image, name, price, availability signal, add-to-cart action; empty/loading/error/success states.
 - **CartLine**: product snapshot, quantity stepper, remove action, subtotal.
 - **CheckoutSummary**: cart lines, totals, payment stub selector, place-order CTA, validation errors.
