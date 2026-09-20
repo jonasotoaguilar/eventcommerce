@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (MVP Target)
+Accepted (current implementation)
 
 ## Context
 

@@ -1,6 +1,6 @@
 """Orders API schemas."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class OrderItemRequest(BaseModel):
@@ -9,7 +9,13 @@ class OrderItemRequest(BaseModel):
 
 
 class OrderCreateRequest(BaseModel):
-    customer_id: str
+    """Create-order body.
+
+    ``customer_id`` is accepted for compatibility but ignored: the
+    authenticated JWT subject is authoritative for ownership (U5).
+    """
+
+    customer_id: str | None = Field(default=None, min_length=1, max_length=128)
     items: list[OrderItemRequest]
 
 

@@ -18,6 +18,11 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 | Transactional outbox | Events are persisted atomically with business state, then forwarded to a broker. Emission (`outbox_events`) and forwarding (outbox scheduler + RabbitMQ publisher in `backend/app/messaging_runtime.py`) are wired; live delivery requires RabbitMQ. | Now |
 | Idempotency | Processing the same event twice must not duplicate side effects. Implemented for the checkout path (`processed_events`) and enforced per-message by the wired AMQP handlers in the same consumer transaction. | Now |
 | Deterministic simulated payment | A payment provider that returns the same authorization result for the same inputs. Implemented in `backend/app/modules/payments/domain/policy.py` (ADR 0005). | Now |
+| Principal | The authenticated caller carried as `CurrentUser` after bearer verification (`backend/app/modules/iam/api/dependencies.py`, `backend/app/modules/iam/application/tokens.py`). | Now |
+| Shopper | The default role assigned at registration (`backend/app/modules/iam/application/register_user.py`); owns only its own commerce resources. | Now |
+| Operator | The privileged role allowed alongside the owner on commerce reads (`backend/app/modules/orders/api/routes.py`). | Now |
+| Subject | The JWT `sub`/`user_id` identifying the caller; commerce derives ownership from it instead of trusting client-sent IDs. | Now |
+| Bearer | The HTTP `Authorization: Bearer <access_token>` credential verified by `get_current_user` (`401` when missing, invalid, or expired). | Now |
 
 ### Bounded contexts
 

@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from app.messaging_runtime import create_messaging_runtime
 from app.modules.checkout.api.container import checkout_container
 from app.modules.checkout.api.routes import router as checkout_router
+from app.modules.iam.api.container import iam_container
+from app.modules.iam.api.routes import router as iam_router
 from app.modules.inventory.api.container import inventory_container
 from app.modules.inventory.api.routes import router as inventory_router
 from app.modules.notifications.api.container import notifications_container
@@ -49,6 +51,7 @@ def create_app() -> FastAPI:
     notifications_container.wire(modules=["app.modules.notifications.api.routes"])
     payments_container.wire(modules=["app.modules.payments.api.routes"])
     checkout_container.wire(modules=["app.modules.checkout.api.routes"])
+    iam_container.wire(modules=["app.modules.iam.api.routes"])
 
     app = FastAPI(
         title=settings.app_name,
@@ -66,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(payments_router, prefix="/api/v1")
     app.include_router(notifications_router, prefix="/api/v1")
     app.include_router(checkout_router, prefix="/api/v1")
+    app.include_router(iam_router, prefix="/api/v1")
 
     return app
 

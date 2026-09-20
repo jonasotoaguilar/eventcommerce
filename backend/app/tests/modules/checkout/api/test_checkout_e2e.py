@@ -33,6 +33,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.app import create_app
+from app.modules.iam.api.dependencies import get_current_user
+from app.modules.iam.application.tokens import CurrentUser
 from app.modules.inventory.domain.entities import Inventory
 from app.modules.inventory.infrastructure.sqlalchemy_repository import (
     SqlAlchemyInventoryRepository,
@@ -117,6 +119,15 @@ async def client(
             yield session
 
     app.dependency_overrides[get_db_session] = override_get_session
+
+    async def override_current_user() -> CurrentUser:
+        return CurrentUser(
+            user_id=UUID("11111111-1111-1111-1111-111111111111"),
+            email="e2e-shopper@example.com",
+            role="shopper",
+        )
+
+    app.dependency_overrides[get_current_user] = override_current_user
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as http_client:

@@ -30,9 +30,13 @@ class CheckoutItemRequest(BaseModel):
 
 
 class CheckoutRequest(BaseModel):
-    """Validated body of ``POST /api/v1/checkout``."""
+    """Validated body of ``POST /api/v1/checkout``.
 
-    customer_id: str = Field(min_length=1, max_length=128)
+    ``customer_id`` is accepted for compatibility but ignored: the
+    authenticated JWT subject is authoritative for ownership (U5).
+    """
+
+    customer_id: str | None = Field(default=None, min_length=1, max_length=128)
     items: list[CheckoutItemRequest] = Field(min_length=1, max_length=MAX_ITEMS)
     amount: Decimal = Field(ge=Decimal("0"), le=MAX_AMOUNT)
     currency: str
