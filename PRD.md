@@ -32,13 +32,13 @@ Event-driven systems quickly become hard to reason about when vocabulary, owners
 - Shared event envelope, event store, and transactional outbox data structures exist; checkout and orders persist `OrderCreated` / `OrderConfirmed` / `OrderCancelled` events.
 - Deterministic simulated payment policy (ADR 0005) replaces the former random stub.
 - Messaging runtime wired into the app lifespan (`backend/app/messaging_runtime.py`, started/stopped by `backend/app/app.py`): outbox scheduler, RabbitMQ publisher, and AMQP consumer with three durable queues; live broker delivery requires RabbitMQ — default suite proves the chain broker-free (`backend/app/tests/runtime/test_chain_e2e.py`), gated CI proves it against a real broker.
-- **Not yet**: IAM/JWT/roles, catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
+- IAM bounded context (`backend/app/modules/iam/`): `POST /api/v1/iam/register` (shopper-only, `201`/`409`), `POST /api/v1/iam/login` (30-minute HS256 access JWT, generic `401`), and `GET /api/v1/iam/me` (bearer, `200`/`401`); commerce reads/writes enforce owner-or-operator access from the JWT subject.
+- **Not yet**: catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
 
 ## MVP Target
 
-The remaining journey on a single event-driven backend. Checkout, deterministic simulated payments, the shared event/outbox/idempotency primitives, and the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ) are already delivered (see [Now](#now)); the following close out the MVP:
+The remaining journey on a single event-driven backend. Checkout, deterministic simulated payments, the shared event/outbox/idempotency primitives, IAM (register/login/me with shopper-only registration, 30-minute access JWT, and owner-or-operator commerce protection), and the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ) are already delivered (see [Now](#now)); the following close out the MVP:
 
-- **IAM** as an owned bounded context with JWT registration, login, and role authorization.
 - **Catalog** and **Cart** contexts for product browsing and purchase collection.
 - **Orders** reaching the full five-state lifecycle (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`) driven by event choreography (runtime already wired; intermediate states not yet reachable).
 - **Inventory** reserving and releasing stock across the five-state lifecycle (single-event reservation/result reaction already wired).
@@ -58,7 +58,7 @@ The remaining journey on a single event-driven backend. Checkout, deterministic 
 - Order status transitions in the current synchronous checkout are `pending` → `{confirmed, cancelled}`, with idempotent self-transitions on terminal states. (Now)
 - MVP Target — five-state lifecycle: order state transitions become `pending` → `{inventory_reserved, cancelled}`, `inventory_reserved` → `{payment_authorized, cancelled}`, and `payment_authorized` → `{confirmed, cancelled}`; no other transitions are allowed.
 - Consumers must be idempotent: processing the same event twice must not duplicate side effects. (Now: checkout path and wired AMQP handlers commit handler + `processed_events` in one per-message transaction; live delivery requires RabbitMQ)
-- JWT tokens carry roles; role authorization is enforced at API boundaries. (MVP Target)
+- JWT tokens carry roles; role authorization is enforced at API boundaries. (Now: 30-minute access JWT; registration is shopper-only; commerce reads/writes enforce owner-or-operator from the JWT subject)
 
 ## Non-goals
 
@@ -67,6 +67,7 @@ The remaining journey on a single event-driven backend. Checkout, deterministic 
 - Web storefront, mobile app, or public SaaS operations.
 - Production-grade observability, SLA guarantees, or multi-region deployment.
 - Saga orchestration and dead-letter queues before the payment flow is stable.
+- IAM abuse controls and production readiness: no rate limiting on register/login, no refresh-token rotation, and no production secret-management or hardening claim.
 
 ## Metrics
 
