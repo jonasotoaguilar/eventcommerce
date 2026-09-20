@@ -51,12 +51,9 @@ class TestOrderLifecycleStatusMigration:
         migration = _load_migration()
 
         assert migration.revision == "f4a5b6c7d8e9"
-        # NOTE: U1 was scoped as chained after cart head e3f4a5b6c7d8, but
-        # that revision is not an ancestor of this branch (it lives on
-        # origin/feat/catalog-cart). Chaining after the actual branch head
-        # keeps `alembic upgrade head` linear; rechain to e3f4a5b6c7d8
-        # when catalog-cart merges underneath this branch.
-        assert migration.down_revision == "c1d2e3f4a5b6"
+        # Chained after the cart head now that catalog-cart (e3f4a5b6c7d8)
+        # has merged underneath this branch.
+        assert migration.down_revision == "e3f4a5b6c7d8"
 
     @pytest.mark.asyncio
     async def test_downgrade_removes_and_upgrade_restores_constraint(
