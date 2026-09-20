@@ -8,6 +8,7 @@ from app.shared.config import get_settings
 from app.shared.db.base import Base
 
 # Import all models so they register with Base.metadata
+from app.modules.catalog.infrastructure.models import ProductModel  # noqa: F401
 from app.modules.orders.infrastructure.models import (  # noqa: F401
     OrderItemModel,
     OrderModel,

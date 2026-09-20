@@ -9,3 +9,14 @@ def reserve_stock(inventory: Inventory, quantity: int) -> None:
         raise InsufficientStockError("Not enough stock available")
     inventory.available_quantity -= quantity
     inventory.reserved_quantity += quantity
+
+
+def adjust_available_stock(inventory: Inventory, delta: int) -> None:
+    """Apply a signed operator delta to available stock.
+
+    Negative deltas that would drive ``available_quantity`` below zero
+    raise :class:`InsufficientStockError`; reserved stock is untouched.
+    """
+    if inventory.available_quantity + delta < 0:
+        raise InsufficientStockError("Not enough stock available")
+    inventory.available_quantity += delta

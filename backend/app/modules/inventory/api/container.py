@@ -3,6 +3,7 @@
 from dependency_injector import containers, providers
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.inventory.application.adjust_stock import AdjustStock
 from app.modules.inventory.application.order_status import OrderStatusQuery
 from app.modules.inventory.application.process_inventory_reservation import (
     ProcessInventoryReservation,
@@ -32,6 +33,8 @@ class InventoryContainer(containers.DeclarativeContainer):
         idempotency=idempotency,
         order_status=order_status_query,
     )
+
+    adjust_stock = providers.Factory(AdjustStock, repository=inventory_repo)
 
 
 inventory_container = InventoryContainer()
