@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { createAuthClient, type SessionUser } from "../lib/auth";
-import { ApiError } from "../lib/api-client";
+import { ApiError, type ApiClient } from "../lib/api-client";
 
 export type SessionStatus = "loading" | "authenticated" | "anonymous";
 
@@ -8,6 +8,8 @@ interface AuthContextValue {
   status: SessionStatus;
   user: SessionUser | null;
   error: string | null;
+  /** Shared shopper API client (token injected; safe for public calls too). */
+  api: ApiClient;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -104,8 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [client]);
 
   const value = useMemo(
-    () => ({ status, user, error, login, register, logout, refresh }),
-    [status, user, error, login, register, logout, refresh],
+    () => ({ status, user, error, api: client.api, login, register, logout, refresh }),
+    [status, user, error, client, login, register, logout, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

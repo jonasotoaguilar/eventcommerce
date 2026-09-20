@@ -19,6 +19,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <li>
               <NavLink to="/">Home</NavLink>
             </li>
+            <li>
+              <NavLink to="/catalog">Catalog</NavLink>
+            </li>
+            {status === "authenticated" && (
+              <li>
+                <NavLink to="/cart">Cart</NavLink>
+              </li>
+            )}
             {status === "authenticated" && user ? (
               <>
                 <li className="nav-user" aria-label={`Signed in as ${user.email}`}>
