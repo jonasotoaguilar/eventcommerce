@@ -53,3 +53,21 @@ def test_health_preserves_composition():
             assert client.get("/health").json()["service"] == app.title
             paths = [getattr(r, "path", "") for r in app.routes]
             assert "/health" in paths
+
+
+def test_cart_routes_preserve_composition():
+    rt = AsyncMock()
+    rt.start = AsyncMock()
+    rt.stop = AsyncMock()
+    with patch("app.app.create_messaging_runtime", return_value=rt):
+        app = create_app()
+        with TestClient(app):
+            routes = {
+                (getattr(r, "path", ""), method)
+                for r in app.routes
+                for method in (sorted(getattr(r, "methods", set()) or []))
+            }
+            assert ("/api/v1/cart", "GET") in routes
+            assert ("/api/v1/cart/items", "POST") in routes
+            assert ("/api/v1/cart/items/{product_id}", "PATCH") in routes
+            assert ("/api/v1/cart/items/{product_id}", "DELETE") in routes

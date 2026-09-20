@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.messaging_runtime import create_messaging_runtime
+from app.modules.cart.api.container import cart_container
+from app.modules.cart.api.routes import router as cart_router
 from app.modules.catalog.api.container import catalog_container
 from app.modules.catalog.api.routes import router as catalog_router
 from app.modules.checkout.api.container import checkout_container
@@ -54,6 +56,7 @@ def create_app() -> FastAPI:
     payments_container.wire(modules=["app.modules.payments.api.routes"])
     checkout_container.wire(modules=["app.modules.checkout.api.routes"])
     catalog_container.wire(modules=["app.modules.catalog.api.routes"])
+    cart_container.wire(modules=["app.modules.cart.api.routes"])
     iam_container.wire(modules=["app.modules.iam.api.routes"])
 
     app = FastAPI(
@@ -73,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router, prefix="/api/v1")
     app.include_router(checkout_router, prefix="/api/v1")
     app.include_router(catalog_router, prefix="/api/v1")
+    app.include_router(cart_router, prefix="/api/v1")
     app.include_router(iam_router, prefix="/api/v1")
 
     return app
