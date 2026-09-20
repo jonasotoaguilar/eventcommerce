@@ -32,7 +32,7 @@ export function HomePage() {
         )}
       </p>
       <div className="notice" role="status" aria-live="polite">
-        Checkout and order tracking open in the next work unit.
+        Checkout and order tracking are available from your cart.
       </div>
     </section>
   );
