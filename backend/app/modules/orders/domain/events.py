@@ -40,3 +40,26 @@ class InventoryRejected(DomainEvent):
     @property
     def order_id(self) -> UUID:
         return self.aggregate_id
+
+
+@dataclass(frozen=True)
+class PaymentAuthorized(DomainEvent):
+    """Event emitted when payment is successfully authorized for an order."""
+
+    result: str = "authorized"
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id
+
+
+@dataclass(frozen=True)
+class PaymentRejected(DomainEvent):
+    """Event emitted when payment authorization fails for an order."""
+
+    result: str = "rejected"
+    reason: str = ""
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id

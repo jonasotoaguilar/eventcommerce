@@ -1,6 +1,6 @@
 """Tests for orders ORM models."""
 
-from sqlalchemy import inspect
+from sqlalchemy import CheckConstraint, inspect
 
 from app.modules.orders.infrastructure.models import OrderItemModel, OrderModel
 from app.shared.events.models import DomainEventModel
@@ -37,3 +37,26 @@ class TestOrderModel:
         rels = {r.key for r in inspect(OrderModel).relationships}
         assert "items" in rels
         assert "events" not in rels
+
+    def test_order_status_lifecycle_check_constraint(self) -> None:
+        checks = {
+            c.name: c.sqltext.text
+            for c in OrderModel.__table__.constraints
+            if isinstance(c, CheckConstraint)
+        }
+        assert "ck_orders_status_lifecycle" in checks
+        sql = checks["ck_orders_status_lifecycle"]
+        for status in (
+            "pending",
+            "inventory_reserved",
+            "payment_authorized",
+            "confirmed",
+            "cancelled",
+        ):
+            assert status in sql
+
+    def test_order_has_single_status_column(self) -> None:
+        status_cols = [
+            c.name for c in OrderModel.__table__.columns if "status" in c.name
+        ]
+        assert status_cols == ["status"]

@@ -106,3 +106,71 @@ class TestOrderEntity:
         )
         with pytest.raises(InvalidStateTransitionError):
             order.confirm()
+
+    def _order_with_status(self, status: str) -> Order:
+        return Order(
+            id=uuid4(),
+            customer_id="cus_1",
+            status=status,
+            cancel_reason=None,
+            created_at=None,  # type: ignore[arg-type]
+            updated_at=None,  # type: ignore[arg-type]
+            items=[],
+        )
+
+    def test_reserve_inventory_from_pending(self) -> None:
+        order = self._order_with_status("pending")
+        order.reserve_inventory()
+        assert order.status == "inventory_reserved"
+
+    def test_reserve_inventory_idempotent(self) -> None:
+        order = self._order_with_status("inventory_reserved")
+        order.reserve_inventory()
+        assert order.status == "inventory_reserved"
+
+    def test_reserve_inventory_from_terminal_raises(self) -> None:
+        for status in ("payment_authorized", "confirmed", "cancelled"):
+            with pytest.raises(InvalidStateTransitionError):
+                self._order_with_status(status).reserve_inventory()
+
+    def test_authorize_payment_from_inventory_reserved(self) -> None:
+        order = self._order_with_status("inventory_reserved")
+        order.authorize_payment()
+        assert order.status == "payment_authorized"
+
+    def test_authorize_payment_idempotent(self) -> None:
+        order = self._order_with_status("payment_authorized")
+        order.authorize_payment()
+        assert order.status == "payment_authorized"
+
+    def test_authorize_payment_from_pending_raises(self) -> None:
+        with pytest.raises(InvalidStateTransitionError):
+            self._order_with_status("pending").authorize_payment()
+
+    def test_authorize_payment_from_terminal_raises(self) -> None:
+        for status in ("confirmed", "cancelled"):
+            with pytest.raises(InvalidStateTransitionError):
+                self._order_with_status(status).authorize_payment()
+
+    def test_confirm_from_payment_authorized(self) -> None:
+        order = self._order_with_status("payment_authorized")
+        order.confirm()
+        assert order.status == "confirmed"
+
+    def test_confirm_from_inventory_reserved_raises(self) -> None:
+        with pytest.raises(InvalidStateTransitionError):
+            self._order_with_status("inventory_reserved").confirm()
+
+    def test_cancel_from_intermediate_states(self) -> None:
+        for status in ("pending", "inventory_reserved", "payment_authorized"):
+            order = self._order_with_status(status)
+            order.cancel(reason="customer_request")
+            assert order.status == "cancelled"
+            assert order.cancel_reason == "customer_request"
+
+    def test_full_choreography_walk(self) -> None:
+        order = self._order_with_status("pending")
+        order.reserve_inventory()
+        order.authorize_payment()
+        order.confirm()
+        assert order.status == "confirmed"

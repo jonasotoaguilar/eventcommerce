@@ -24,6 +24,24 @@ class Order:
     updated_at: datetime
     items: list[OrderItem] = field(default_factory=list)
 
+    def reserve_inventory(self) -> None:
+        if not can_transition(self.status, "inventory_reserved"):
+            raise InvalidStateTransitionError(
+                f"Cannot reserve inventory for order from status {self.status}"
+            )
+        if self.status != "inventory_reserved":
+            self.status = "inventory_reserved"
+            self.updated_at = datetime.now(timezone.utc)
+
+    def authorize_payment(self) -> None:
+        if not can_transition(self.status, "payment_authorized"):
+            raise InvalidStateTransitionError(
+                f"Cannot authorize payment for order from status {self.status}"
+            )
+        if self.status != "payment_authorized":
+            self.status = "payment_authorized"
+            self.updated_at = datetime.now(timezone.utc)
+
     def confirm(self) -> None:
         if not can_transition(self.status, "confirmed"):
             raise InvalidStateTransitionError(
