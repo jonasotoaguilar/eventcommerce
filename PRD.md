@@ -26,20 +26,22 @@ Event-driven systems quickly become hard to reason about when vocabulary, owners
 
 ## Now
 
-- Modular Python backend in `backend/app/` with `orders`, `inventory`, `payments`, `notifications`, and `checkout` bounded contexts wired with `dependency-injector`.
+- Modular Python backend in `backend/app/` with `orders`, `inventory`, `payments`, `notifications`, `checkout`, `iam`, `catalog`, and `cart` bounded contexts wired with `dependency-injector`.
 - Orders HTTP API (`POST /api/v1/orders`, `GET /api/v1/orders/{order_id}`, `GET /api/v1/orders/{order_id}/timeline`) and a synchronous checkout at `POST /api/v1/checkout`.
 - Checkout coordinates order creation, inventory reservation, deterministic payment authorization, and order confirmation/cancellation in one request, with durable `Idempotency-Key` handling: a replay returns the cached response, and a reused key with a different payload returns `409`.
 - Shared event envelope, event store, and transactional outbox data structures exist; checkout and orders persist `OrderCreated` / `OrderConfirmed` / `OrderCancelled` events.
 - Deterministic simulated payment policy (ADR 0005) replaces the former random stub.
 - Messaging runtime wired into the app lifespan (`backend/app/messaging_runtime.py`, started/stopped by `backend/app/app.py`): outbox scheduler, RabbitMQ publisher, and AMQP consumer with three durable queues; live broker delivery requires RabbitMQ — default suite proves the chain broker-free (`backend/app/tests/runtime/test_chain_e2e.py`), gated CI proves it against a real broker.
 - IAM bounded context (`backend/app/modules/iam/`): `POST /api/v1/iam/register` (shopper-only, `201`/`409`), `POST /api/v1/iam/login` (30-minute HS256 access JWT, generic `401`), and `GET /api/v1/iam/me` (bearer, `200`/`401`); commerce reads/writes enforce owner-or-operator access from the JWT subject.
-- **Not yet**: catalog, cart, the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
+- Catalog bounded context (`backend/app/modules/catalog/`): public `GET /api/v1/catalog` (active-only browse) and `GET /api/v1/catalog/{product_id}` (detail; missing and inactive share one `404`), plus operator `POST` / `PATCH /api/v1/catalog` product management. Catalog creation seeds an inventory row at zero stock; operators adjust stock via `POST /api/v1/inventory/{product_id}/adjust`.
+- Cart bounded context (`backend/app/modules/cart/`): `GET /api/v1/cart` (lazily created), `POST` / `PATCH` / `DELETE /api/v1/cart/items/{product_id}` — one persisted cart per authenticated shopper, owner-scoped by the JWT subject, with live subtotal from active catalog prices.
+- Checkout accepts either the inline `{items, amount, currency}` shape or an optional `cart_id` alone, deriving lines, amount, and currency from authoritative catalog pricing; the JWT subject stays authoritative for ownership.
+- **Not yet**: the five-state order lifecycle, confirm/cancel HTTP routes, and the storefront frontend.
 
 ## MVP Target
 
-The remaining journey on a single event-driven backend. Checkout, deterministic simulated payments, the shared event/outbox/idempotency primitives, IAM (register/login/me with shopper-only registration, 30-minute access JWT, and owner-or-operator commerce protection), and the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ) are already delivered (see [Now](#now)); the following close out the MVP:
+The remaining journey on a single event-driven backend. Checkout (inline and `cart_id` shapes), deterministic simulated payments, catalog browse/manage, owner-scoped carts, the shared event/outbox/idempotency primitives, IAM (register/login/me with shopper-only registration, 30-minute access JWT, and owner-or-operator commerce protection), and the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ) are already delivered (see [Now](#now)); the following close out the MVP:
 
-- **Catalog** and **Cart** contexts for product browsing and purchase collection.
 - **Orders** reaching the full five-state lifecycle (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`) driven by event choreography (runtime already wired; intermediate states not yet reachable).
 - **Inventory** reserving and releasing stock across the five-state lifecycle (single-event reservation/result reaction already wired).
 - **Notifications** reacting to order events across the five-state lifecycle (terminal `OrderConfirmed`/`OrderCancelled` reaction already wired).

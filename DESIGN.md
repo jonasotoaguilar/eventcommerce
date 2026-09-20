@@ -125,7 +125,7 @@ components:
 # Design
 
 > **Target Design Notice**
-> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes a synchronous `POST /api/v1/checkout` and an orders HTTP API, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
+> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), and orders HTTP APIs, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
 
 ## Overview
 
@@ -139,9 +139,9 @@ This document owns the target screen map, user flows, visual tokens, component s
 
 | Step | Now | MVP Target |
 |---|---|---|
-| Browse catalog | API-only; no UI | Catalog page with filters, search, and stock signal |
-| Add to cart | API-only; no UI | Cart drawer/page with line items, quantities, and subtotal |
-| Review checkout | API-only; no UI | Checkout summary with shipping, payment stub, and place-order CTA |
+| Browse catalog | `GET /api/v1/catalog` + detail; no UI | Catalog page with filters, search, and stock signal |
+| Add to cart | Cart line API (`GET /api/v1/cart`, item add/set/remove); no UI | Cart drawer/page with line items, quantities, and subtotal |
+| Review checkout | Checkout accepts inline items or `cart_id`; no UI | Checkout summary with shipping, payment stub, and place-order CTA |
 | Place order | `POST /api/v1/checkout` (synchronous) | Same commerce path, surfaced through a checkout form |
 | View order status | `GET /api/v1/orders/{id}` | Order tracking page with live status and timeline |
 | Receive result | Raw JSON response | In-context success, failure, or pending message |
@@ -150,10 +150,10 @@ This document owns the target screen map, user flows, visual tokens, component s
 
 | Step | Now | MVP Target |
 |---|---|---|
-| Review catalog | API-only; no UI | Operator catalog list with edit and stock-adjust actions |
-| Adjust stock | API-only; no UI | Inline stock editor with confirmation and event log |
-| List orders | API-only; no UI | Order queue with filters by status and date |
-| Confirm or cancel | API-only; no UI | Operator action triggers the existing domain transitions |
+| Review catalog | Catalog product API (operator `POST`/`PATCH`); no UI | Operator catalog list with edit and stock-adjust actions |
+| Adjust stock | `POST /api/v1/inventory/{product_id}/adjust` (operator); no UI | Inline stock editor with confirmation and event log |
+| List orders | Orders HTTP API; no UI | Order queue with filters by status and date |
+| Confirm or cancel | Domain transitions via checkout only; no operator route or UI | Operator action triggers the existing domain transitions |
 | Inspect payment decision | Read logs/tests | Payment simulation panel showing deterministic result for inputs |
 
 ### Checkout success / failure / pending flow
