@@ -24,6 +24,28 @@ class OrderResponse(BaseModel):
     status: str
 
 
+class OrderCancelRequest(BaseModel):
+    """Operator cancel body: validated reason with a stable default.
+
+    The orders contract carries ``cancel_reason`` as free text, so the
+    operator path defaults to ``operator_cancelled`` instead of
+    inventing a bounded enum (U4).
+    """
+
+    reason: str = Field(default="operator_cancelled", min_length=1, max_length=128)
+
+
+class OrderConfirmResponse(BaseModel):
+    order_id: str
+    status: str
+
+
+class OrderCancelResponse(BaseModel):
+    order_id: str
+    status: str
+    cancel_reason: str | None = None
+
+
 class TimelineEventResponse(BaseModel):
     event_type: str
     occurred_at: str

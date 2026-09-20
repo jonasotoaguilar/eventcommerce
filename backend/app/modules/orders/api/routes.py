@@ -14,20 +14,28 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.iam.api.dependencies import get_current_user
+from app.modules.iam.api.dependencies import get_current_user, require_roles
 from app.modules.iam.application.tokens import CurrentUser
 
 from app.modules.orders.api.container import OrdersContainer, orders_container
 from app.modules.orders.api.schemas import (
+    OrderCancelRequest,
+    OrderCancelResponse,
+    OrderConfirmResponse,
     OrderCreateRequest,
     OrderResponse,
     TimelineEventResponse,
 )
+from app.modules.orders.application.cancel_order import CancelOrder
+from app.modules.orders.application.confirm_order import ConfirmOrder
 from app.modules.orders.application.create_order import CreateOrder
 from app.modules.orders.application.get_order import GetOrder
 from app.modules.orders.application.get_order_timeline import GetOrderTimeline
 from app.modules.orders.domain.entities import OrderItem
-from app.modules.orders.domain.errors import OrderNotFoundError
+from app.modules.orders.domain.errors import (
+    InvalidStateTransitionError,
+    OrderNotFoundError,
+)
 from app.shared.db.session import get_db_session
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -112,3 +120,63 @@ async def get_timeline(
     _ensure_owner_or_operator(order.customer_id, current)
     events = await use_case.execute(order_id)
     return [TimelineEventResponse(**e) for e in events]
+
+
+@router.post("/{order_id}/confirm", status_code=200)
+@inject
+async def confirm_order(
+    order_id: UUID,
+    current: CurrentUser = Depends(require_roles(OPERATOR_ROLE)),
+    session: AsyncSession = Depends(_orders_db_session),
+    use_case: ConfirmOrder = Depends(Provide[OrdersContainer.confirm_order]),
+) -> OrderConfirmResponse:
+    """Confirm a payment-authorized order (operator only, U4).
+
+    ``payment_authorized -> confirmed`` confirms; an already-confirmed
+    order is an idempotent retry. Any other state is a stable 409 and
+    missing rows are 404. The role gate runs before any order lookup,
+    so non-operators learn nothing about order existence.
+    """
+    del current
+    try:
+        order = await use_case.execute(order_id)
+    except OrderNotFoundError:
+        raise HTTPException(status_code=404, detail="Order not found") from None
+    except InvalidStateTransitionError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await session.commit()
+    return OrderConfirmResponse(order_id=str(order.id), status=order.status)
+
+
+@router.post("/{order_id}/cancel", status_code=200)
+@inject
+async def cancel_order(
+    order_id: UUID,
+    body: OrderCancelRequest,
+    current: CurrentUser = Depends(require_roles(OPERATOR_ROLE)),
+    session: AsyncSession = Depends(_orders_db_session),
+    use_case: CancelOrder = Depends(Provide[OrdersContainer.cancel_order]),
+) -> OrderCancelResponse:
+    """Cancel a non-terminal order with a validated reason (operator only, U4).
+
+    Cancellation is allowed from ``pending``, ``inventory_reserved``
+    and ``payment_authorized``; an already-cancelled order is an
+    idempotent retry. A ``confirmed`` order is a stable 409 and missing
+    rows are 404. The role gate runs before any order lookup, so
+    non-operators learn nothing about order existence.
+    """
+    del current
+    try:
+        order = await use_case.execute(order_id, body.reason)
+    except OrderNotFoundError:
+        raise HTTPException(status_code=404, detail="Order not found") from None
+    except InvalidStateTransitionError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await session.commit()
+    return OrderCancelResponse(
+        order_id=str(order.id),
+        status=order.status,
+        cancel_reason=order.cancel_reason,
+    )
