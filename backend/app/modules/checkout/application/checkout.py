@@ -102,6 +102,9 @@ class Checkout:
         self._notifier = notifier
 
     async def execute(self, request: CheckoutRequest) -> CheckoutResult:
+        customer_id = request.customer_id
+        if customer_id is None:
+            raise ValueError("customer_id is required")
         key = request.idempotency_key
         request_hash: str | None = None
         if key is not None:
@@ -126,7 +129,7 @@ class Checkout:
                 )
 
         order = await self._create_order.execute(
-            customer_id=request.customer_id,
+            customer_id=customer_id,
             items=[
                 OrderItem(product_id=item.product_id, quantity=item.quantity)
                 for item in request.items
