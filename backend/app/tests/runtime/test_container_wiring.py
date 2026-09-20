@@ -1,5 +1,5 @@
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.messaging_runtime import create_messaging_runtime
@@ -27,10 +27,11 @@ def _sf():
 def test_bindings():
     rt = create_messaging_runtime(_S(), _sf)  # type: ignore
     c = rt._consumer  # type: ignore
-    assert isinstance(c, MessageConsumer) and len(c._bindings) == 3
+    assert isinstance(c, MessageConsumer) and len(c._bindings) == 4
     assert {b.queue for b in c._bindings} == {
         "inventory.order_created",
         "orders.inventory_result",
+        "payments.inventory_reserved",
         "notifications.order_terminal",
     }
     assert sorted(e for b in c._bindings for e in b.event_types) == sorted(
@@ -38,6 +39,7 @@ def test_bindings():
             "OrderCreated",
             "InventoryReserved",
             "InventoryRejected",
+            "OrderInventoryReserved",
             "OrderConfirmed",
             "OrderCancelled",
         ]
@@ -122,6 +124,33 @@ async def test_wiring():
         with pytest.raises(ValueError):
             await h(
                 payload={}, event_id=eid, event_type="OrderCreated", aggregate_id=aid
+            )
+    pay_f = next(
+        b.handler_factory
+        for b in rt._consumer._bindings
+        if b.queue == "payments.inventory_reserved"
+    )  # type: ignore
+    with patch(
+        "app.modules.payments.application.process_inventory_reserved.ProcessOrderInventoryReserved.execute",
+        new_callable=AsyncMock,
+    ) as m:
+        h = pay_f(s)
+        eid, aid = str(uuid4()), str(uuid4())
+        # Caller payloads are never trusted: even a forged amount rides
+        # along untouched while the order id drives the use case.
+        await h(
+            payload={"amount": "1.00", "currency": "USD"},
+            event_id=eid,
+            event_type="OrderInventoryReserved",
+            aggregate_id=aid,
+        )
+        assert m.call_args.kwargs == {"event_id": eid, "order_id": UUID(aid)}
+        with pytest.raises(ValueError):
+            await h(
+                payload={},
+                event_id=eid,
+                event_type="InventoryReserved",
+                aggregate_id=aid,
             )
     with patch(
         "app.modules.notifications.application.process_order_notification.ProcessOrderNotification.execute",

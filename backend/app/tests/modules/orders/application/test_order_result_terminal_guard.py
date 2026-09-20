@@ -162,8 +162,9 @@ async def test_terminal_skip_regardless_of_result_value() -> None:
 
 
 @pytest.mark.asyncio
-async def test_pending_reserved_confirms_and_pending_rejected_cancels() -> None:
-    # pending -> confirmed on reserved
+async def test_pending_reserved_stages_and_pending_rejected_cancels() -> None:
+    # pending -> inventory_reserved on reserved, emitting the order-owned
+    # internal event (never OrderConfirmed on the async path).
     oid = uuid4()
     order_repo = FakeOrderRepository({oid: _order(oid, "pending")})
     event_repo = FakeEventRepository()
@@ -173,17 +174,30 @@ async def test_pending_reserved_confirms_and_pending_rejected_cancels() -> None:
     eid = str(uuid4())
     await uc.execute(event_id=eid, order_id=oid, result="reserved")
     found = await order_repo.get_by_id(oid)
-    assert found is not None and found.status == "confirmed"
+    assert found is not None and found.status == "inventory_reserved"
     assert order_repo.save_calls == 1
     assert any(e["event_type"] == "InventoryReserved" for e in event_repo.events)
-    assert any(e["event_type"] == "OrderConfirmed" for e in outbox.events)
+    staged = [e for e in outbox.events if e["event_type"] == "OrderInventoryReserved"]
+    assert len(staged) == 1
+    assert staged[0]["payload"] == {"status": "inventory_reserved"}
+    assert not any(e["event_type"] == "OrderConfirmed" for e in outbox.events)
     assert await idem.is_processed(eid, "ProcessOrderInventoryResult")
     # duplicate pending result no second transition
     await uc.execute(event_id=eid, order_id=oid, result="reserved")
     assert order_repo.save_calls == 1
-    assert len([e for e in outbox.events if e["event_type"] == "OrderConfirmed"]) == 1
+    assert (
+        len([e for e in outbox.events if e["event_type"] == "OrderInventoryReserved"])
+        == 1
+    )
     assert (
         len([e for e in event_repo.events if e["event_type"] == "InventoryReserved"])
+        == 1
+    )
+    # redelivery under a fresh event id is state-idempotent as well
+    await uc.execute(event_id=str(uuid4()), order_id=oid, result="reserved")
+    assert order_repo.save_calls == 1
+    assert (
+        len([e for e in outbox.events if e["event_type"] == "OrderInventoryReserved"])
         == 1
     )
     # pending -> cancelled on rejected

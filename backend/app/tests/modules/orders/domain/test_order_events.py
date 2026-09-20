@@ -7,6 +7,7 @@ from app.modules.orders.domain.events import (
     InventoryRejected,
     InventoryReserved,
     OrderCreated,
+    OrderInventoryReserved,
     PaymentAuthorized,
     PaymentRejected,
 )
@@ -62,6 +63,16 @@ class TestOrderEventVocabulary:
         assert rejected.order_id == aggregate_id
         assert rejected.result == "rejected"
         assert rejected.reason == "insufficient_stock"
+
+    def test_order_inventory_reserved_defaults(self) -> None:
+        aggregate_id = uuid4()
+        event = OrderInventoryReserved(
+            event_id=uuid4(),
+            aggregate_id=aggregate_id,
+            occurred_at=datetime.now(timezone.utc),
+        )
+        assert event.order_id == aggregate_id
+        assert event.status == "inventory_reserved"
 
     def test_order_created_unchanged(self) -> None:
         aggregate_id = uuid4()

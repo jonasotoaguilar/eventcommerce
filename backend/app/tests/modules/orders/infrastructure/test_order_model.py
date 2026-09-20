@@ -1,6 +1,8 @@
 """Tests for orders ORM models."""
 
-from sqlalchemy import CheckConstraint, inspect
+from typing import cast
+
+from sqlalchemy import CheckConstraint, Table, inspect
 
 from app.modules.orders.infrastructure.models import OrderItemModel, OrderModel
 from app.shared.events.models import DomainEventModel
@@ -39,9 +41,10 @@ class TestOrderModel:
         assert "events" not in rels
 
     def test_order_status_lifecycle_check_constraint(self) -> None:
+        table = cast(Table, OrderModel.__table__)
         checks = {
             c.name: c.sqltext.text
-            for c in OrderModel.__table__.constraints
+            for c in table.constraints
             if isinstance(c, CheckConstraint)
         }
         assert "ck_orders_status_lifecycle" in checks

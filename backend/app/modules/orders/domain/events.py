@@ -43,6 +43,23 @@ class InventoryRejected(DomainEvent):
 
 
 @dataclass(frozen=True)
+class OrderInventoryReserved(DomainEvent):
+    """Internal order-owned event staging payment authorization.
+
+    Emitted through the outbox after the order has durably moved to
+    ``inventory_reserved``. The payments consumer authorizes against
+    authoritative catalog totals only when it observes this event, so
+    payment authorization can never race the order-state transition.
+    """
+
+    status: str = "inventory_reserved"
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id
+
+
+@dataclass(frozen=True)
 class PaymentAuthorized(DomainEvent):
     """Event emitted when payment is successfully authorized for an order."""
 

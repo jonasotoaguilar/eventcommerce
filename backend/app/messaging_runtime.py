@@ -71,6 +71,53 @@ def _orders_handler_factory(session: AsyncSession):  # type: ignore[no-untyped-d
     return _handle
 
 
+def _payments_handler_factory(session: AsyncSession):  # type: ignore[no-untyped-def]
+    from app.modules.catalog.infrastructure.sqlalchemy_repository import (
+        SqlAlchemyProductRepository,
+    )
+    from app.modules.orders.infrastructure.sqlalchemy_repository import (
+        SqlAlchemyOrderRepository,
+    )
+    from app.modules.payments.application.authorize_payment import AuthorizePayment
+    from app.modules.payments.application.process_inventory_reserved import (
+        ProcessOrderInventoryReserved,
+    )
+    from app.modules.payments.application.process_payment_failure import (
+        ProcessPaymentFailure,
+    )
+    from app.modules.payments.infrastructure.sqlalchemy_repository import (
+        SqlAlchemyPaymentRepository,
+    )
+    from app.shared.messaging.idempotency import ProcessedEventStore
+    from app.shared.messaging.outbox_repository import SqlAlchemyOutboxRepository
+
+    order_repo = SqlAlchemyOrderRepository(session)
+    product_repo = SqlAlchemyProductRepository(session)
+    payment_repo = SqlAlchemyPaymentRepository(session)
+    handler = ProcessOrderInventoryReserved(
+        order_repo=order_repo,
+        product_repo=product_repo,
+        authorize_payment=AuthorizePayment(payment_repo),
+        process_failure=ProcessPaymentFailure(payment_repo),
+        outbox=SqlAlchemyOutboxRepository(session),
+        idempotency=ProcessedEventStore(session),
+    )
+
+    async def _handle(  # type: ignore[no-untyped-def]
+        *, payload: dict, event_id: str, event_type: str, aggregate_id: str
+    ) -> None:
+        if event_type != "OrderInventoryReserved":
+            raise ValueError(f"unsupported event_type: {event_type}")
+        order_id = UUID(str(aggregate_id))
+        UUID(str(event_id))
+        # The payload is never trusted for pricing: the use case reloads
+        # the order lines and derives amount/currency from catalog.
+        _ = payload
+        await handler.execute(event_id=event_id, order_id=order_id)
+
+    return _handle
+
+
 def _notifications_handler_factory(session: AsyncSession):  # type: ignore[no-untyped-def]
     from app.modules.notifications.api.container import NotificationsContainer
 
@@ -106,6 +153,12 @@ def _create_wired_consumer(session_factory, settings):  # type: ignore[no-untype
             event_types=("InventoryReserved", "InventoryRejected"),
             consumer_name="ProcessOrderInventoryResult",
             handler_factory=_orders_handler_factory,
+        ),
+        ConsumerBinding(
+            queue="payments.inventory_reserved",
+            event_types=("OrderInventoryReserved",),
+            consumer_name="ProcessOrderInventoryReserved",
+            handler_factory=_payments_handler_factory,
         ),
         ConsumerBinding(
             queue="notifications.order_terminal",
