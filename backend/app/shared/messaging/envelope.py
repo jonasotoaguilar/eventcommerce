@@ -16,6 +16,7 @@ class EventEnvelope(BaseModel):
         "OrderInventoryReserved",
         "PaymentAuthorized",
         "PaymentRejected",
+        "OrderPaymentAuthorized",
         "OrderConfirmed",
         "OrderCancelled",
     ]

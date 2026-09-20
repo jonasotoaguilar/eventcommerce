@@ -8,6 +8,7 @@ from app.modules.orders.domain.events import (
     InventoryReserved,
     OrderCreated,
     OrderInventoryReserved,
+    OrderPaymentAuthorized,
     PaymentAuthorized,
     PaymentRejected,
 )
@@ -73,6 +74,16 @@ class TestOrderEventVocabulary:
         )
         assert event.order_id == aggregate_id
         assert event.status == "inventory_reserved"
+
+    def test_order_payment_authorized_defaults(self) -> None:
+        aggregate_id = uuid4()
+        event = OrderPaymentAuthorized(
+            event_id=uuid4(),
+            aggregate_id=aggregate_id,
+            occurred_at=datetime.now(timezone.utc),
+        )
+        assert event.order_id == aggregate_id
+        assert event.status == "payment_authorized"
 
     def test_order_created_unchanged(self) -> None:
         aggregate_id = uuid4()

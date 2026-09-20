@@ -27,11 +27,13 @@ def _sf():
 def test_bindings():
     rt = create_messaging_runtime(_S(), _sf)  # type: ignore
     c = rt._consumer  # type: ignore
-    assert isinstance(c, MessageConsumer) and len(c._bindings) == 4
+    assert isinstance(c, MessageConsumer) and len(c._bindings) == 6
     assert {b.queue for b in c._bindings} == {
         "inventory.order_created",
         "orders.inventory_result",
         "payments.inventory_reserved",
+        "orders.payment_result",
+        "orders.payment_authorized",
         "notifications.order_terminal",
     }
     assert sorted(e for b in c._bindings for e in b.event_types) == sorted(
@@ -40,6 +42,9 @@ def test_bindings():
             "InventoryReserved",
             "InventoryRejected",
             "OrderInventoryReserved",
+            "PaymentAuthorized",
+            "PaymentRejected",
+            "OrderPaymentAuthorized",
             "OrderConfirmed",
             "OrderCancelled",
         ]
@@ -165,6 +170,100 @@ async def test_wiring():
             aggregate_id=aid,
         )
         m.assert_awaited_once()
+    pay_result_f = next(
+        b.handler_factory
+        for b in rt._consumer._bindings
+        if b.queue == "orders.payment_result"
+    )  # type: ignore
+    with (
+        patch(
+            "app.modules.orders.application.process_payment_result.ProcessOrderPaymentResult.execute",
+            new_callable=AsyncMock,
+        ) as orders_m,
+        patch(
+            "app.modules.inventory.application.process_payment_rejected.ProcessPaymentRejected.execute",
+            new_callable=AsyncMock,
+        ) as inv_comp_m,
+    ):
+        h = pay_result_f(s)
+        eid, aid = str(uuid4()), str(uuid4())
+        await h(
+            payload={"result": "authorized"},
+            event_id=eid,
+            event_type="PaymentAuthorized",
+            aggregate_id=aid,
+        )
+        assert orders_m.call_args.kwargs == {
+            "event_id": eid,
+            "order_id": UUID(aid),
+            "result": "authorized",
+        }
+        assert inv_comp_m.await_count == 0
+        orders_m.reset_mock()
+        await h(
+            payload={"result": "rejected"},
+            event_id=eid,
+            event_type="PaymentRejected",
+            aggregate_id=aid,
+        )
+        assert orders_m.call_args.kwargs["result"] == "rejected"
+        assert inv_comp_m.await_count == 1
+        assert inv_comp_m.call_args.kwargs == {
+            "event_id": eid,
+            "order_id": UUID(aid),
+        }
+        # Strict-guard fan-out order: compensation runs while the order is
+        # still staged, before the orders-side cancellation.
+        from unittest.mock import Mock
+
+        orders_m.reset_mock()
+        inv_comp_m.reset_mock()
+        manager = Mock()
+        manager.attach_mock(inv_comp_m, "compensation")
+        manager.attach_mock(orders_m, "orders")
+        eid2 = str(uuid4())
+        await h(
+            payload={"result": "rejected"},
+            event_id=eid2,
+            event_type="PaymentRejected",
+            aggregate_id=aid,
+        )
+        assert [c[0] for c in manager.mock_calls] == [
+            "compensation",
+            "orders",
+        ]
+        with pytest.raises(ValueError):
+            await h(
+                payload={},
+                event_id=eid,
+                event_type="OrderCreated",
+                aggregate_id=aid,
+            )
+    finalizer_f = next(
+        b.handler_factory
+        for b in rt._consumer._bindings
+        if b.queue == "orders.payment_authorized"
+    )  # type: ignore
+    with patch(
+        "app.modules.orders.application.finalize_payment_authorized.FinalizePaymentAuthorized.execute",
+        new_callable=AsyncMock,
+    ) as m:
+        h = finalizer_f(s)
+        eid, aid = str(uuid4()), str(uuid4())
+        await h(
+            payload={"status": "payment_authorized"},
+            event_id=eid,
+            event_type="OrderPaymentAuthorized",
+            aggregate_id=aid,
+        )
+        assert m.call_args.kwargs == {"event_id": eid, "order_id": UUID(aid)}
+        with pytest.raises(ValueError):
+            await h(
+                payload={},
+                event_id=eid,
+                event_type="PaymentAuthorized",
+                aggregate_id=aid,
+            )
 
 
 def test_containers():

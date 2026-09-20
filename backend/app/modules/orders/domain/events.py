@@ -71,6 +71,23 @@ class PaymentAuthorized(DomainEvent):
 
 
 @dataclass(frozen=True)
+class OrderPaymentAuthorized(DomainEvent):
+    """Internal order-owned event staging confirmation.
+
+    Emitted through the outbox after the order has durably moved to
+    ``payment_authorized``. The orders finalizer confirms only when it
+    observes this event, so confirmation can never race the order-state
+    transition.
+    """
+
+    status: str = "payment_authorized"
+
+    @property
+    def order_id(self) -> UUID:
+        return self.aggregate_id
+
+
+@dataclass(frozen=True)
 class PaymentRejected(DomainEvent):
     """Event emitted when payment authorization fails for an order."""
 
