@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/session";
+import { isOperator } from "../lib/operator";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { status, user, logout } = useAuth();
@@ -26,6 +27,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <li>
                 <NavLink to="/cart">Cart</NavLink>
               </li>
+            )}
+            {isOperator(user) && (
+              <>
+                <li>
+                  <NavLink to="/operator/catalog">Operator catalog</NavLink>
+                </li>
+                <li>
+                  <NavLink to="/operator/orders">Operator orders</NavLink>
+                </li>
+                <li>
+                  <NavLink to="/operator/payments">Operator payments</NavLink>
+                </li>
+              </>
             )}
             {status === "authenticated" && user ? (
               <>
