@@ -8,6 +8,10 @@ durable contract cannot silently drift from the models.
 import importlib.util
 from pathlib import Path
 
+from app.modules.cart.infrastructure.models import (  # noqa: F401
+    CartItemModel,
+    CartModel,
+)
 from app.shared.db.base import Base
 
 VERSIONS = Path(__file__).resolve().parents[5] / "alembic" / "versions"
@@ -50,9 +54,10 @@ class TestCartMigrationChain:
         downstreams = set(revisions.values())
         heads = [rev for rev in revisions if rev not in downstreams]
         # U1 (expand-order-state-machine) appended the five-state order
-        # lifecycle revision f4a5b6c7d8e9 chained after the cart head, so
-        # the linear head moved from e3f4a5b6c7d8 to f4a5b6c7d8e9.
-        assert heads == ["f4a5b6c7d8e9"]
+        # lifecycle revision f4a5b6c7d8e9 chained after the cart head, and W3
+        # (security-hardening) appended the refresh-token revision
+        # b8c9d0e1f2a3 after that one, so the linear head moved on again.
+        assert heads == ["b8c9d0e1f2a3"]
 
 
 class TestCartTablesRegistered:

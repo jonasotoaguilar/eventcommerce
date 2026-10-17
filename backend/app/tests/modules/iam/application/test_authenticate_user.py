@@ -1,7 +1,7 @@
 """AuthenticateUser use-case tests (fake repository, no secrets asserted)."""
 
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from app.modules.iam.application import authenticate_user as authenticate_module
@@ -18,6 +18,9 @@ class FakeUserRepository:
 
     async def get_by_email(self, normalized_email: str) -> User | None:
         return self._store.get(normalized_email)
+
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        return next((user for user in self._store.values() if user.id == user_id), None)
 
     async def add(self, user: User) -> None:
         self._store[user.email] = user

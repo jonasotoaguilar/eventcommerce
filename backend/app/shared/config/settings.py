@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = Field(
         default=30, alias="EVENTCOMMERCE_JWT_EXPIRES_MINUTES"
     )
+    refresh_token_expires_days: int = Field(
+        default=14, alias="EVENTCOMMERCE_REFRESH_TOKEN_EXPIRES_DAYS"
+    )
 
     login_rate_limit_attempts: int = Field(
         default=10, alias="EVENTCOMMERCE_LOGIN_RATE_LIMIT_ATTEMPTS"

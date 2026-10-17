@@ -1,6 +1,7 @@
 """SQLAlchemy implementation of UserRepository."""
 
 from typing import cast
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +11,17 @@ from app.modules.iam.domain.entities import User, UserRole
 from app.modules.iam.domain.errors import DuplicateEmailError
 from app.modules.iam.domain.repository import UserRepository
 from app.modules.iam.infrastructure.models import UserModel
+
+
+def _to_entity(orm: UserModel) -> User:
+    return User(
+        id=orm.id,
+        email=orm.email,
+        password_hash=orm.password_hash,
+        role=cast(UserRole, orm.role),
+        created_at=orm.created_at,
+        updated_at=orm.updated_at,
+    )
 
 
 class SqlAlchemyUserRepository(UserRepository):
@@ -25,14 +37,16 @@ class SqlAlchemyUserRepository(UserRepository):
         orm = result.scalar_one_or_none()
         if orm is None:
             return None
-        return User(
-            id=orm.id,
-            email=orm.email,
-            password_hash=orm.password_hash,
-            role=cast(UserRole, orm.role),
-            created_at=orm.created_at,
-            updated_at=orm.updated_at,
+        return _to_entity(orm)
+
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        result = await self._session.execute(
+            select(UserModel).where(UserModel.id == user_id)
         )
+        orm = result.scalar_one_or_none()
+        if orm is None:
+            return None
+        return _to_entity(orm)
 
     async def add(self, user: User) -> None:
         self._session.add(

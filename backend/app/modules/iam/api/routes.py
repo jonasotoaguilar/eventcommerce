@@ -1,4 +1,4 @@
-"""IAM API routes: register (201/409), login (200/401), me (200/401)."""
+"""IAM API routes: register (201/409), login (200/401), refresh, me."""
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
 
@@ -15,20 +15,27 @@ from app.modules.iam.api.rate_limit import (
 from app.modules.iam.api.schemas import (
     LoginRequest,
     MeResponse,
+    RefreshRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
 )
 from app.modules.iam.application.tokens import CurrentUser, issue_token
 from app.modules.iam.domain.entities import User
-from app.modules.iam.domain.errors import DuplicateEmailError, InvalidCredentialsError
-from app.modules.iam.domain.repository import UserRepository
+from app.modules.iam.domain.errors import (
+    DuplicateEmailError,
+    InvalidCredentialsError,
+    InvalidTokenError,
+)
+from app.modules.iam.domain.repository import RefreshTokenRepository, UserRepository
 from app.shared.db.session import get_db_session
 
 router = APIRouter(prefix="/iam", tags=["iam"])
 
 RegisterUserFn = Callable[..., Awaitable[User]]
 AuthenticateUserFn = Callable[..., Awaitable[User]]
+IssueRefreshTokenFn = Callable[..., Awaitable[str]]
+RotateRefreshTokenFn = Callable[..., Awaitable[tuple[User, str]]]
 
 
 async def _iam_db_session(
@@ -70,8 +77,14 @@ async def login(
     # Load-bearing: binds the request session into the container for the repo.
     session: AsyncSession = Depends(_iam_db_session),
     repository: UserRepository = Depends(Provide[IamContainer.user_repo]),
+    refresh_repository: RefreshTokenRepository = Depends(
+        Provide[IamContainer.refresh_token_repo]
+    ),
     authenticate_user: AuthenticateUserFn = Depends(
         Provide[IamContainer.authenticate_user]
+    ),
+    issue_refresh_token: IssueRefreshTokenFn = Depends(
+        Provide[IamContainer.issue_refresh_token]
     ),
 ) -> TokenResponse:
     """Authenticate with generic 401; never distinguishes the failure cause."""
@@ -82,7 +95,46 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         ) from exc
-    return TokenResponse(access_token=issue_token(user.id, user.email, user.role))
+    refresh_token = await issue_refresh_token(refresh_repository, user.id)
+    await session.commit()
+    return TokenResponse(
+        access_token=issue_token(user.id, user.email, user.role),
+        refresh_token=refresh_token,
+    )
+
+
+@router.post("/refresh")
+@inject
+async def refresh(
+    body: RefreshRequest,
+    # Load-bearing: binds the request session into the container for the repo.
+    session: AsyncSession = Depends(_iam_db_session),
+    repository: UserRepository = Depends(Provide[IamContainer.user_repo]),
+    refresh_repository: RefreshTokenRepository = Depends(
+        Provide[IamContainer.refresh_token_repo]
+    ),
+    rotate_refresh_token: RotateRefreshTokenFn = Depends(
+        Provide[IamContainer.rotate_refresh_token]
+    ),
+) -> TokenResponse:
+    """Rotate one refresh token; every failure shares a generic 401."""
+    try:
+        user, successor = await rotate_refresh_token(
+            repository, refresh_repository, body.refresh_token
+        )
+    except InvalidTokenError as exc:
+        # A replay revokes its family inside the use case; persist that
+        # revocation even though the answer is a rejection.
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        ) from exc
+    await session.commit()
+    return TokenResponse(
+        access_token=issue_token(user.id, user.email, user.role),
+        refresh_token=successor,
+    )
 
 
 @router.get("/me")
