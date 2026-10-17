@@ -27,3 +27,12 @@ class CatalogRowResponse(BaseModel):
     active: bool
     available_quantity: int | None
     reserved_quantity: int | None
+
+
+class PaymentSimulationResponse(BaseModel):
+    order_id: UUID
+    amount: Decimal
+    currency: str
+    approved: bool
+    digest_byte: int
+    approval_threshold: int

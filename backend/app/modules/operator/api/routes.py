@@ -1,6 +1,6 @@
-"""Operator API routes (read-only order queue and catalog).
+"""Operator API routes (read-only order queue, catalog, payment simulation).
 
-Both endpoints require JWT role ``operator`` (401 anonymous, 403
+All endpoints require JWT role ``operator`` (401 anonymous, 403
 otherwise).
 
 ``GET /api/v1/operator/orders``: ``status`` accepts only the five
@@ -12,15 +12,28 @@ payment row per order and stays null when the order has no payment;
 ``GET /api/v1/operator/catalog``: lists inactive products too, with
 stock joined from the inventory context and null quantities when the
 product has no inventory row.
+
+``GET /api/v1/operator/payments/simulation``: evaluates the delivered
+deterministic payment policy for the given inputs without touching
+storage.
 """
 
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
+from uuid import UUID
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.checkout.api.schemas import MAX_AMOUNT
+from app.modules.payments.domain.policy import (
+    APPROVAL_THRESHOLD,
+    is_payment_approved,
+    payment_digest_byte,
+)
 
 from app.modules.iam.api.dependencies import require_roles
 from app.modules.iam.application.tokens import CurrentUser
@@ -28,7 +41,11 @@ from app.modules.operator.api.container import (
     OperatorContainer,
     operator_container,
 )
-from app.modules.operator.api.schemas import CatalogRowResponse, OrderQueueRowResponse
+from app.modules.operator.api.schemas import (
+    CatalogRowResponse,
+    OrderQueueRowResponse,
+    PaymentSimulationResponse,
+)
 from app.modules.operator.application.list_catalog_with_stock import (
     ListCatalogWithStock,
 )
@@ -38,6 +55,10 @@ from app.shared.db.session import get_db_session
 router = APIRouter(prefix="/operator", tags=["operator"])
 
 OPERATOR_ROLE = "operator"
+
+# Checkout normalizes currency case before validating, so accepting any case
+# here keeps this panel's decision identical to the real checkout flow.
+_CURRENCY_QUERY_PATTERN = r"^[A-Za-z]{3}$"
 
 OrderQueueStatus = Literal[
     "pending",
@@ -122,3 +143,27 @@ async def list_catalog(
         )
         for row in rows
     ]
+
+
+@router.get("/payments/simulation")
+async def simulate_payment(
+    current: CurrentUser = Depends(require_roles(OPERATOR_ROLE)),
+    order_id: UUID = Query(),
+    amount: Decimal = Query(gt=Decimal("0"), le=MAX_AMOUNT),  # type: ignore[bad-argument-type]
+    currency: str = Query(pattern=_CURRENCY_QUERY_PATTERN),
+) -> PaymentSimulationResponse:
+    del current
+    exponent = amount.as_tuple().exponent
+    if isinstance(exponent, int) and exponent < -2:
+        raise HTTPException(
+            status_code=422, detail="amount must have at most two decimal places"
+        )
+    normalized_currency = currency.upper()
+    return PaymentSimulationResponse(
+        order_id=order_id,
+        amount=amount,
+        currency=normalized_currency,
+        approved=is_payment_approved(str(order_id), amount, normalized_currency),
+        digest_byte=payment_digest_byte(str(order_id), amount, normalized_currency),
+        approval_threshold=APPROVAL_THRESHOLD,
+    )
