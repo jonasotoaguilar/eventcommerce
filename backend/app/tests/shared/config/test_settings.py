@@ -51,3 +51,15 @@ class TestSettings:
         settings = Settings()
         assert (settings.jwt_secret, settings.jwt_issuer) == ("s", "iss")
         assert (settings.jwt_audience, settings.jwt_expires_minutes) == ("aud", 30)
+
+    def test_refresh_lifetime_defaults_to_14_days(self, monkeypatch):
+        monkeypatch.delenv("EVENTCOMMERCE_REFRESH_TOKEN_EXPIRES_DAYS", raising=False)
+
+        settings = Settings()
+        assert settings.refresh_token_expires_days == 14
+
+    def test_refresh_lifetime_uses_prefix(self, monkeypatch):
+        monkeypatch.setenv("EVENTCOMMERCE_REFRESH_TOKEN_EXPIRES_DAYS", "30")
+
+        settings = Settings()
+        assert settings.refresh_token_expires_days == 30

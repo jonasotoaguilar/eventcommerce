@@ -1,7 +1,7 @@
 """U6 IAM security regression: responses never leak secrets.
 
 Proves register/login/me success and error bodies omit password,
-password_hash, secret, and token material beyond the login access_token.
+password_hash, secret, and token material beyond the login token pair.
 Unit-level TestClient with dependency overrides; no live DB.
 """
 
@@ -57,7 +57,9 @@ def _user() -> User:
     )
 
 
-def _client(monkeypatch, register_fn=None, authenticate_fn=None) -> FastAPI:
+def _client(
+    monkeypatch, register_fn=None, authenticate_fn=None, issue_fn=None
+) -> FastAPI:
     settings = _settings()
     monkeypatch.setattr(iam_tokens, "get_settings", lambda: settings)
     monkeypatch.setattr(iam_dependencies, "get_settings", lambda: settings)
@@ -66,18 +68,25 @@ def _client(monkeypatch, register_fn=None, authenticate_fn=None) -> FastAPI:
     async def override_get_session():
         yield _DummySession()  # type: ignore[misc]
 
+    async def default_issue(repository, user_id, settings=None) -> str:
+        return "refresh-value-for-regression-test"
+
     app.dependency_overrides[get_db_session] = override_get_session
     iam_container.user_repo.override(object())
+    iam_container.refresh_token_repo.override(object())
     iam_container.register_user.override(register_fn or real_register)
     iam_container.authenticate_user.override(authenticate_fn or real_authenticate)
+    iam_container.issue_refresh_token.override(issue_fn or default_issue)
     return app
 
 
 def _teardown(app) -> None:
     app.dependency_overrides.clear()
     iam_container.user_repo.reset_override()
+    iam_container.refresh_token_repo.reset_override()
     iam_container.register_user.reset_override()
     iam_container.authenticate_user.reset_override()
+    iam_container.issue_refresh_token.reset_override()
 
 
 def _assert_no_secrets(body: object, raw: str) -> None:
@@ -135,7 +144,7 @@ def test_register_conflict_omits_secrets(monkeypatch) -> None:
         _teardown(app)
 
 
-def test_login_success_only_token_material_is_access_token(monkeypatch) -> None:
+def test_login_success_only_token_material_is_token_pair(monkeypatch) -> None:
     user = _user()
 
     async def fake_authenticate(repository, email: str, password: str) -> User:
@@ -150,10 +159,14 @@ def test_login_success_only_token_material_is_access_token(monkeypatch) -> None:
         )
         assert response.status_code == 200
         body = response.json()
-        assert set(body) == {"access_token", "token_type"}
+        assert set(body) == {"access_token", "refresh_token", "token_type"}
         assert body["token_type"] == "bearer"
         assert body["access_token"]
-        _assert_no_secrets(body, response.text.replace(body["access_token"], ""))
+        assert body["refresh_token"]
+        redacted = response.text.replace(body["access_token"], "").replace(
+            body["refresh_token"], ""
+        )
+        _assert_no_secrets(body, redacted)
     finally:
         _teardown(app)
 

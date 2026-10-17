@@ -16,6 +16,28 @@ def normalize_email(email: str) -> str:
 
 
 @dataclass
+class RefreshToken:
+    id: UUID
+    user_id: UUID
+    family_id: UUID
+    token_hash: str
+    created_at: datetime
+    expires_at: datetime
+    consumed_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("created_at", "expires_at"):
+            value = getattr(self, name)
+            if value.tzinfo is None:
+                raise ValueError(f"{name} must be timezone-aware")
+        for name in ("consumed_at", "revoked_at"):
+            value = getattr(self, name)
+            if value is not None and value.tzinfo is None:
+                raise ValueError(f"{name} must be timezone-aware")
+
+
+@dataclass
 class User:
     id: UUID
     email: str

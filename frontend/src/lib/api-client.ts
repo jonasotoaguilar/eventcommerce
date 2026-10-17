@@ -15,6 +15,12 @@ export interface ApiClientOptions {
   baseUrl?: string;
   getToken?: () => string | null;
   onUnauthorized?: () => void;
+  /**
+   * Mint a fresh access token after a 401 (e.g. via the refresh
+   * endpoint). Resolves to the new token, or null when the session
+   * cannot be recovered. Called at most once per request.
+   */
+  refreshAccessToken?: () => Promise<string | null>;
 }
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
@@ -54,7 +60,11 @@ export function createApiClient(options: ApiClientOptions = {}) {
   const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
   const getToken = options.getToken ?? (() => null);
 
-  async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  async function request<T>(
+    path: string,
+    init: RequestOptions = {},
+    retried = false,
+  ): Promise<T> {
     const { jsonBody, headers, ...rest } = init;
     const token = getToken();
     const response = await fetch(`${baseUrl}${path}`, {
@@ -66,6 +76,18 @@ export function createApiClient(options: ApiClientOptions = {}) {
       },
       body: jsonBody === undefined ? undefined : JSON.stringify(jsonBody),
     });
+
+    // One recovery attempt per request, only for requests that carried a
+    // token: token-less 401s (failed logins) must not mint a session.
+    if (response.status === 401 && !retried && token !== null) {
+      let renewed: string | null = null;
+      try {
+        renewed = (await options.refreshAccessToken?.()) ?? null;
+      } catch {
+        renewed = null;
+      }
+      if (renewed) return request<T>(path, init, true);
+    }
 
     if (response.status === 401) {
       options.onUnauthorized?.();
