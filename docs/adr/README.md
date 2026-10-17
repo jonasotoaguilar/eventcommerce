@@ -24,6 +24,7 @@ The status column is **independent of the horizon tags** in `PRD.md`. `Now` / `M
 | 0003 | [Use dependency-injector for DI](./0003-use-dependency-injector.md) | Accepted (current implementation) |
 | 0004 | [Own IAM as a bounded context](./0004-own-iam-context.md) | Accepted (current implementation) |
 | 0005 | [Use deterministic simulated payments](./0005-use-deterministic-simulated-payments.md) | Accepted (current implementation) |
+| 0006 | [Use a dedicated operator read model](./0006-use-dedicated-operator-read-model.md) | Accepted (current implementation) |
 
 ## Interpretation
 

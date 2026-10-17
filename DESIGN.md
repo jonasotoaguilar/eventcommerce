@@ -124,8 +124,8 @@ components:
 
 # Design
 
-> **Shopper Storefront Delivered / Operator UI Target**
-> The React/Vite shopper storefront in `frontend/` is delivered: catalog browse/detail, authenticated persisted cart, cart-backed synchronous checkout (`{cart_id}` + fresh `Idempotency-Key` per attempt), and order tracking at `/orders/:id` with the exact five statuses, chronological timeline, and manual refresh rather than live polling. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), orders HTTP APIs including operator-only confirm/cancel routes, and the delivered five-state event-driven order path. The shopper rows below describe delivered UI; operator rows remain target UI. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
+> **Shopper Storefront and Operator Console Delivered**
+> The React/Vite shopper storefront in `frontend/` is delivered: catalog browse/detail, authenticated persisted cart, cart-backed synchronous checkout (`{cart_id}` + fresh `Idempotency-Key` per attempt), and order tracking at `/orders/:id` with the exact five statuses, chronological timeline, and manual refresh rather than live polling. The operator console in `frontend/` is delivered: catalog list including inactive products with edit and stock-adjust actions (`/operator/catalog`), order queue with status/date filters and confirm/cancel actions (`/operator/orders`), and payment simulation panel (`/operator/payments`), all behind the `operator` role with on-demand reads and manual refresh rather than live updates. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), orders HTTP APIs including operator-only confirm/cancel routes, the three operator reads (`GET /api/v1/operator/orders`, `GET /api/v1/operator/catalog`, `GET /api/v1/operator/payments/simulation`), and the delivered five-state event-driven order path. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
 
 ## Overview
 
@@ -150,11 +150,11 @@ This document owns the target screen map, user flows, visual tokens, component s
 
 | Step | Now | MVP Target |
 |---|---|---|
-| Review catalog | Catalog product API (operator `POST`/`PATCH`); no UI | Operator catalog list with edit and stock-adjust actions |
-| Adjust stock | `POST /api/v1/inventory/{product_id}/adjust` (operator); no UI | Inline stock editor with confirmation and event log |
-| List orders | Orders HTTP API; no UI | Order queue with filters by status and date |
-| Confirm or cancel | Operator-only `POST /api/v1/orders/{order_id}/confirm` / `POST /api/v1/orders/{order_id}/cancel`; no UI | Operator queue row triggers the delivered operator routes |
-| Inspect payment decision | Read logs/tests | Payment simulation panel showing deterministic result for inputs |
+| Review catalog | Operator catalog screen over `GET /api/v1/operator/catalog`; edits via operator `POST`/`PATCH` | Operator catalog list with edit and stock-adjust actions |
+| Adjust stock | Inline stock editor with confirmation over the delivered `POST /api/v1/inventory/{product_id}/adjust` route | Inline stock editor with confirmation and event log |
+| List orders | Operator queue screen over `GET /api/v1/operator/orders` | Order queue with filters by status and date |
+| Confirm or cancel | Operator queue row triggers the delivered operator-only `POST /api/v1/orders/{order_id}/confirm` / `POST /api/v1/orders/{order_id}/cancel` routes | Operator queue row triggers the delivered operator routes |
+| Inspect payment decision | Payment simulation panel over `GET /api/v1/operator/payments/simulation` | Payment simulation panel showing deterministic result for inputs |
 
 ### Checkout success / failure / pending flow
 
@@ -183,8 +183,8 @@ The synchronous `POST /api/v1/checkout` compatibility boundary still returns a t
 | Cart | Review selected items before checkout | Shopper | Now (delivered) | Cart is empty | Spinner overlay | Item unavailable | Ready for checkout |
 | Checkout | Review cart lines and totals, place the order | Shopper | Now (delivered) | — | Placing order… | Payment / stock failure | Order placed |
 | Order tracking | Follow order status and timeline | Shopper | Now (delivered) | Order not found | Loading timeline | Fetch error | Status + events shown |
-| Operator catalog | Manage products and stock | Store Operator | Future | No catalog entries | Skeleton list | Save failed | Changes saved |
-| Operator orders | Review and act on order queue | Store Operator | Future | No orders | Loading queue | Fetch error | Queue rendered |
+| Operator catalog | Manage products and stock | Store Operator | Now (delivered) | No catalog entries | Skeleton list | Save failed | Changes saved |
+| Operator orders | Review and act on order queue | Store Operator | Now (delivered) | No orders | Loading queue | Fetch error | Queue rendered |
 | Login / Register | Authenticate before protected flows | Shopper | Now (delivered) | — | Authenticating… | Invalid credentials | Logged in |
 
 ## Colors
@@ -263,7 +263,7 @@ Never describe an unwired consumer or partial backend flow as if it were live in
 
 ## Components
 
-Components are described by responsibility and states, not by framework-specific implementation. The delivered shopper UI implements them in React/Vite under `frontend/src/` (auth session, route-guarded pages, `ProductCard`, `CartLineRow`, `CheckoutSummary`, `StatusBadge`, `OrderTimeline`).
+Components are described by responsibility and states, not by framework-specific implementation. The delivered shopper UI implements them in React/Vite under `frontend/src/` (auth session, route-guarded pages, `ProductCard`, `CartLineRow`, `CheckoutSummary`, `StatusBadge`, `OrderTimeline`). The delivered operator console implements `OperatorOrderRow` and `StockEditor` behind `OperatorRoute` (`/operator/catalog`, `/operator/orders`, `/operator/payments`) with on-demand reads and manual refresh rather than live updates.
 
 - **Button**: primary, secondary, danger, ghost variants; loading state with `aria-busy`.
 - **StatusBadge**: maps to `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`; includes icon + text.
@@ -280,7 +280,7 @@ Components are described by responsibility and states, not by framework-specific
 - **Do** show the same order status to the shopper and the operator; a single source of truth builds trust.
 - **Do** reserve primary color for the main action on a screen; do not paint every CTA primary.
 - **Do** provide an empty state with a clear next action instead of a blank area.
-- **Do** present delivered shopper screens in the present tense; keep present-tense claims off screens marked Future.
+- **Do** present delivered shopper and operator screens in the present tense; keep present-tense claims off undelivered screens.
 - **Don't** duplicate backend topology diagrams.
 - **Don't** rely on color alone to communicate status; pair it with text and icons.
-- **Don't** claim live polling on the tracker; the delivered experience is manual refresh with the last good snapshot preserved on refresh failure.
+- **Don't** claim live polling on the tracker or the operator screens; the delivered experience is manual refresh with the last good snapshot preserved on refresh failure.

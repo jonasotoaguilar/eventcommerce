@@ -37,6 +37,7 @@ Event-driven systems quickly become hard to reason about when vocabulary, owners
 - Cart bounded context (`backend/app/modules/cart/`): `GET /api/v1/cart` (lazily created), `POST /api/v1/cart/items`, `PATCH` / `DELETE /api/v1/cart/items/{product_id}` — one persisted cart per authenticated shopper, owner-scoped by the JWT subject, with live subtotal from active catalog prices.
 - Checkout accepts either the inline `{items, amount, currency}` shape or an optional `cart_id` alone, deriving lines, amount, and currency from authoritative catalog pricing; the JWT subject stays authoritative for ownership.
 - Shopper storefront in `frontend/` (React/Vite): catalog browse/detail, authenticated persisted cart, cart-backed synchronous checkout (`{cart_id}` alone with a fresh `Idempotency-Key` per attempt; terminal `confirmed`/`cancelled` in one request; form state preserved through recoverable 404/409/422/500 errors), and order tracking at `/orders/:id` with the exact five statuses, chronological timeline, cancellation reason, and manual refresh rather than live polling. Auth shell with login/register and route-guarded shopper pages.
+- Operator console in `frontend/` (`/operator/catalog`, `/operator/orders`, `/operator/payments` behind the `operator` role): catalog list including inactive products with edit and stock-adjust actions, order queue with status/date filters and confirm/cancel actions reusing the delivered operator routes, and a payment simulation panel over the deterministic policy. On-demand reads with manual refresh rather than live updates; no dashboards, analytics, or user administration.
 
 ## MVP Target
 
@@ -50,7 +51,7 @@ The shopper journey is delivered on a single event-driven backend. Checkout (inl
 
 - Real payment provider adapter.
 - Saga orchestration and dead-letter handling.
-- Observability stack, runbooks, production deployment, and operator UI.
+- Observability stack, runbooks, and production deployment.
 
 ## Business Rules
 
@@ -66,7 +67,7 @@ The shopper journey is delivered on a single event-driven backend. Checkout (inl
 
 - Real card processing or PCI compliance in the MVP.
 - Production deployment/operations of the AMQP runtime (wired runtime delivered; live delivery requires RabbitMQ; gated CI proves integration; no production SLA/ops, DLQ, saga, observability, or payment-consumer claim).
-- Operator UI, mobile app, or public SaaS operations.
+- Mobile app or public SaaS operations.
 - Production-grade observability, SLA guarantees, or multi-region deployment.
 - Saga orchestration and dead-letter queues before the payment flow is stable.
 - IAM abuse controls and production readiness: no rate limiting on register/login, no refresh-token rotation, and no production secret-management or hardening claim.
