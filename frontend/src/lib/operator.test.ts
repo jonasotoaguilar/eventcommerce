@@ -7,10 +7,12 @@ import {
   isOperator,
   parseStockDelta,
   validateCancelReason,
+  validateSimulationInput,
 } from "./operator";
+import { runPaymentSimulation } from "../pages/OperatorPaymentsPage";
 
 function stubApi() {
-  const get = vi.fn(async () => null);
+  const get = vi.fn(async (): Promise<unknown> => null);
   const patch = vi.fn(async () => null);
   const post = vi.fn(async () => null);
   const api = { get, patch, post } as unknown as ApiClient;
@@ -310,6 +312,121 @@ describe("formatStockChange", () => {
 
   it("renders only the result when the previous quantity is unknown", () => {
     expect(formatStockChange(null, 5)).toBe("5");
+  });
+});
+
+describe("validateSimulationInput", () => {
+  const validOrderId = "123e4567-e89b-12d3-a456-426614174000";
+
+  it("accepts a valid input and normalizes the currency to upper case", () => {
+    expect(
+      validateSimulationInput({
+        orderId: validOrderId,
+        amount: "12.50",
+        currency: "usd",
+      }),
+    ).toEqual({
+      ok: true,
+      value: { orderId: validOrderId, amount: "12.50", currency: "USD" },
+    });
+  });
+
+  it("rejects a malformed order id", () => {
+    const result = validateSimulationInput({
+      orderId: "not-a-uuid",
+      amount: "12.50",
+      currency: "USD",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.orderId).toMatch(/uuid/i);
+  });
+
+  it("rejects a zero amount", () => {
+    const result = validateSimulationInput({
+      orderId: validOrderId,
+      amount: "0",
+      currency: "USD",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.amount).toMatch(/greater than zero/i);
+  });
+
+  it("rejects a negative amount", () => {
+    const result = validateSimulationInput({
+      orderId: validOrderId,
+      amount: "-5.00",
+      currency: "USD",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.amount).toMatch(/greater than zero/i);
+  });
+
+  it("rejects an amount above the delivered maximum", () => {
+    const result = validateSimulationInput({
+      orderId: validOrderId,
+      amount: "1000000000",
+      currency: "USD",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.amount).toMatch(/999999999\.99/);
+  });
+
+  it("rejects an amount with more than two decimals", () => {
+    const result = validateSimulationInput({
+      orderId: validOrderId,
+      amount: "12.505",
+      currency: "USD",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.amount).toMatch(/two decimal/i);
+  });
+
+  it("rejects a non-3-letter currency", () => {
+    const result = validateSimulationInput({
+      orderId: validOrderId,
+      amount: "12.50",
+      currency: "USDD",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.currency).toMatch(/three letters/i);
+  });
+});
+
+describe("runPaymentSimulation", () => {
+  const validOrderId = "123e4567-e89b-12d3-a456-426614174000";
+
+  it("builds the simulation query the endpoint expects", async () => {
+    const { api, get } = stubApi();
+    get.mockResolvedValueOnce({
+      order_id: validOrderId,
+      amount: "12.50",
+      currency: "USD",
+      approved: true,
+      digest_byte: 10,
+      approval_threshold: 192,
+    });
+    await runPaymentSimulation(api, {
+      orderId: validOrderId,
+      amount: "12.50",
+      currency: "usd",
+    });
+    expect(get).toHaveBeenCalledOnce();
+    expect(get).toHaveBeenCalledWith(
+      `/operator/payments/simulation?order_id=${validOrderId}&amount=12.50&currency=USD`,
+    );
+  });
+
+  it("propagates ApiError from the simulation read", async () => {
+    const { api, get } = stubApi();
+    const failure = new ApiError(422, "Invalid simulation input.");
+    get.mockRejectedValueOnce(failure);
+    await expect(
+      runPaymentSimulation(api, {
+        orderId: validOrderId,
+        amount: "12.50",
+        currency: "USD",
+      }),
+    ).rejects.toBe(failure);
   });
 });
 

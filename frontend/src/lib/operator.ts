@@ -162,6 +162,80 @@ export interface SimulatePaymentInput {
   currency?: string;
 }
 
+/** Delivered checkout ceiling mirrored by the simulation read (`MAX_AMOUNT`). */
+export const MAX_SIMULATION_AMOUNT = "999999999.99";
+
+const SIMULATION_MAX_CENTS = 99999999999n;
+const UUID_PATTERN =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const SIMULATION_AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
+const SIMULATION_CURRENCY_PATTERN = /^[A-Za-z]{3}$/;
+
+export interface ValidSimulationInput {
+  orderId: string;
+  amount: string;
+  currency: string;
+}
+
+export interface SimulationInputErrors {
+  orderId?: string;
+  amount?: string;
+  currency?: string;
+}
+
+export type ValidatedSimulationInput =
+  | { ok: true; value: ValidSimulationInput }
+  | { ok: false; errors: SimulationInputErrors };
+
+/** Cents of a validated `intPart.fracPart` decimal, exact for any size. */
+function decimalToCents(intPart: string, fracPart: string): bigint {
+  return BigInt(intPart) * 100n + BigInt(fracPart.padEnd(2, "0"));
+}
+
+/**
+ * Mirror the simulation endpoint's query rules before any request:
+ * UUID order id, positive amount with at most two decimals within the
+ * delivered maximum, and a three-letter currency normalized to upper
+ * case. Failures stay local instead of round-tripping to a 422.
+ */
+export function validateSimulationInput(
+  raw: SimulatePaymentInput,
+): ValidatedSimulationInput {
+  const errors: SimulationInputErrors = {};
+
+  const orderId = (raw.orderId ?? "").trim();
+  if (!UUID_PATTERN.test(orderId))
+    errors.orderId = "Enter the order id as a UUID.";
+
+  const amount = (raw.amount ?? "").trim();
+  if (!SIMULATION_AMOUNT_PATTERN.test(amount)) {
+    errors.amount =
+      amount.startsWith("-") || amount === "0" || amount === "0.00"
+        ? "Enter an amount greater than zero."
+        : "Enter a positive amount with at most two decimal places.";
+  } else {
+    const dot = amount.indexOf(".");
+    const cents = decimalToCents(
+      dot === -1 ? amount : amount.slice(0, dot),
+      dot === -1 ? "" : amount.slice(dot + 1),
+    );
+    if (cents <= 0n) errors.amount = "Enter an amount greater than zero.";
+    else if (cents > SIMULATION_MAX_CENTS)
+      errors.amount = `Enter an amount of ${MAX_SIMULATION_AMOUNT} or less.`;
+  }
+
+  const currency = (raw.currency ?? "").trim();
+  if (!SIMULATION_CURRENCY_PATTERN.test(currency))
+    errors.currency = "Enter a currency of exactly three letters.";
+
+  if (errors.orderId !== undefined || errors.amount !== undefined || errors.currency !== undefined)
+    return { ok: false, errors };
+  return {
+    ok: true,
+    value: { orderId, amount, currency: currency.toUpperCase() },
+  };
+}
+
 /** Single role predicate: only JWT subjects with the operator role qualify. */
 export function isOperator(user: SessionUser | null | undefined): boolean {
   return user?.role === "operator";
