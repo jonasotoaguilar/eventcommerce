@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.iam.api.container import IamContainer, iam_container
 from app.modules.iam.api.dependencies import get_current_user
+from app.modules.iam.api.rate_limit import (
+    enforce_login_rate_limit,
+    enforce_register_rate_limit,
+)
 from app.modules.iam.api.schemas import (
     LoginRequest,
     MeResponse,
@@ -42,6 +46,7 @@ async def _iam_db_session(
 @inject
 async def register(
     body: RegisterRequest,
+    _rate_limit: None = Depends(enforce_register_rate_limit),
     session: AsyncSession = Depends(_iam_db_session),
     repository: UserRepository = Depends(Provide[IamContainer.user_repo]),
     register_user: RegisterUserFn = Depends(Provide[IamContainer.register_user]),
@@ -61,6 +66,7 @@ async def register(
 @inject
 async def login(
     body: LoginRequest,
+    _rate_limit: None = Depends(enforce_login_rate_limit),
     # Load-bearing: binds the request session into the container for the repo.
     session: AsyncSession = Depends(_iam_db_session),
     repository: UserRepository = Depends(Provide[IamContainer.user_repo]),
