@@ -131,17 +131,17 @@ class TestLockAndCheckAvailability:
         self, session_factory
     ) -> None:
         await _seed(session_factory, {"p1": (10, 0)})
-        session = session_factory()
-        with pytest.raises(IntegrityError):
-            async with session.begin():
-                repo = SqlAlchemyInventoryRepository(session)
-                await _lock_and_reserve(repo, [("p1", 3)])
-                await session.execute(
-                    text(
-                        "INSERT INTO inventory (product_id, available_quantity, "
-                        "reserved_quantity) VALUES ('p1', 99, 0)"
+        async with session_factory() as session:
+            with pytest.raises(IntegrityError):
+                async with session.begin():
+                    repo = SqlAlchemyInventoryRepository(session)
+                    await _lock_and_reserve(repo, [("p1", 3)])
+                    await session.execute(
+                        text(
+                            "INSERT INTO inventory (product_id, available_quantity, "
+                            "reserved_quantity) VALUES ('p1', 99, 0)"
+                        )
                     )
-                )
 
         async with session_factory() as session2:
             repo2 = SqlAlchemyInventoryRepository(session2)
@@ -184,42 +184,42 @@ class TestConcurrentLocking:
         """
         await _seed(session_factory, {"a": (10, 0), "b": (10, 0)})
 
-        s1 = session_factory()
-        async with s1.begin():
-            repo1 = SqlAlchemyInventoryRepository(s1)
-            await repo1.lock_and_check_availability([("a", 1)])
+        async with session_factory() as s1:
+            async with session_factory() as s2:
+                async with s1.begin():
+                    repo1 = SqlAlchemyInventoryRepository(s1)
+                    await repo1.lock_and_check_availability([("a", 1)])
 
-            s2 = session_factory()
-            started = asyncio.Event()
+                    started = asyncio.Event()
 
-            async def tx2() -> None:
-                async with s2.begin():
-                    started.set()
-                    repo2 = SqlAlchemyInventoryRepository(s2)
-                    locked = await repo2.lock_and_check_availability(
-                        [("b", 1), ("a", 1)]
+                    async def tx2() -> None:
+                        async with s2.begin():
+                            started.set()
+                            repo2 = SqlAlchemyInventoryRepository(s2)
+                            locked = await repo2.lock_and_check_availability(
+                                [("b", 1), ("a", 1)]
+                            )
+                            for inventory in locked:
+                                reserve_stock(inventory, 1)
+                                await repo2.save(inventory)
+
+                    task = asyncio.create_task(tx2())
+                    await started.wait()
+                    # tx2 must block on a row lock held by tx1.
+                    with pytest.raises(asyncio.TimeoutError):
+                        await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
+
+                    # tx1 completes its own multi-line reserve (sorted order, no wait)
+                    # and commits; tx2's blocked statement then resumes.
+                    locked_ab = await asyncio.wait_for(
+                        repo1.lock_and_check_availability([("a", 1), ("b", 1)]),
+                        timeout=2.0,
                     )
-                    for inventory in locked:
+                    for inventory in locked_ab:
                         reserve_stock(inventory, 1)
-                        await repo2.save(inventory)
+                        await repo1.save(inventory)
 
-            task = asyncio.create_task(tx2())
-            await started.wait()
-            # tx2 must block on a row lock held by tx1.
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
-
-            # tx1 completes its own multi-line reserve (sorted order, no wait)
-            # and commits; tx2's blocked statement then resumes.
-            locked_ab = await asyncio.wait_for(
-                repo1.lock_and_check_availability([("a", 1), ("b", 1)]),
-                timeout=2.0,
-            )
-            for inventory in locked_ab:
-                reserve_stock(inventory, 1)
-                await repo1.save(inventory)
-
-        await task
+                await task
 
         async with session_factory() as session:
             repo = SqlAlchemyInventoryRepository(session)
@@ -245,12 +245,17 @@ class TestConcurrentLocking:
             async with session_factory() as session:
                 async with session.begin():
                     repo = SqlAlchemyInventoryRepository(session)
-                    await barrier.wait()
+                    # Fail fast instead of hanging CI if a peer never arrives.
+                    await asyncio.wait_for(barrier.wait(), timeout=10)
                     await _lock_and_reserve(repo, lines)
 
-        await asyncio.gather(
-            flow([("p1", 1), ("p2", 1), ("p3", 1)]),
-            flow([("p3", 1), ("p2", 1), ("p1", 1)]),
+        # Fail fast instead of hanging CI if a flow stalls on a row lock.
+        await asyncio.wait_for(
+            asyncio.gather(
+                flow([("p1", 1), ("p2", 1), ("p3", 1)]),
+                flow([("p3", 1), ("p2", 1), ("p1", 1)]),
+            ),
+            timeout=60,
         )
 
         async with session_factory() as session:
@@ -272,7 +277,8 @@ async def _adjust(
     async with session_factory() as session:
         async with session.begin():
             if barrier is not None:
-                await barrier.wait()
+                # Fail fast instead of hanging CI if a peer never arrives.
+                await asyncio.wait_for(barrier.wait(), timeout=10)
             repo = SqlAlchemyInventoryRepository(session)
             await AdjustStock(repo).execute(product_id, delta)
 
@@ -301,28 +307,28 @@ class TestLockByProduct:
     ) -> None:
         """A concurrent adjust must wait on the held row lock."""
         await _seed(session_factory, {"p1": (10, 0)})
-        s1 = session_factory()
-        async with s1.begin():
-            repo1 = SqlAlchemyInventoryRepository(s1)
-            locked = await repo1.lock_by_product("p1")
-            assert locked is not None
+        async with session_factory() as s1:
+            async with session_factory() as s2:
+                async with s1.begin():
+                    repo1 = SqlAlchemyInventoryRepository(s1)
+                    locked = await repo1.lock_by_product("p1")
+                    assert locked is not None
 
-            s2 = session_factory()
-            started = asyncio.Event()
+                    started = asyncio.Event()
 
-            async def tx2() -> None:
-                async with s2.begin():
-                    started.set()
-                    repo2 = SqlAlchemyInventoryRepository(s2)
-                    result = await repo2.lock_by_product("p1")
-                    assert result is not None
+                    async def tx2() -> None:
+                        async with s2.begin():
+                            started.set()
+                            repo2 = SqlAlchemyInventoryRepository(s2)
+                            result = await repo2.lock_by_product("p1")
+                            assert result is not None
 
-            task = asyncio.create_task(tx2())
-            await started.wait()
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
+                    task = asyncio.create_task(tx2())
+                    await started.wait()
+                    with pytest.raises(asyncio.TimeoutError):
+                        await asyncio.wait_for(asyncio.shield(task), timeout=0.5)
 
-        await task
+                await task
 
 
 class TestConcurrentAdjusts:
@@ -333,9 +339,13 @@ class TestConcurrentAdjusts:
         await _seed(session_factory, {"p1": (0, 0)})
         barrier = asyncio.Barrier(2)
 
-        await asyncio.gather(
-            _adjust(session_factory, "p1", 5, barrier),
-            _adjust(session_factory, "p1", 7, barrier),
+        # Fail fast instead of hanging CI if a flow stalls on a row lock.
+        await asyncio.wait_for(
+            asyncio.gather(
+                _adjust(session_factory, "p1", 5, barrier),
+                _adjust(session_factory, "p1", 7, barrier),
+            ),
+            timeout=60,
         )
 
         async with session_factory() as session:
