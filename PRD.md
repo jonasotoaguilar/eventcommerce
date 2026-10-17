@@ -70,7 +70,7 @@ The shopper journey is delivered on a single event-driven backend. Checkout (inl
 - Mobile app or public SaaS operations.
 - Production-grade observability, SLA guarantees, or multi-region deployment.
 - Saga orchestration and dead-letter queues before the payment flow is stable.
-- IAM abuse controls and production readiness: rate limiting on register/login is delivered (in-process, settings-driven; see ADR 0007), refresh-token rotation is decided but not delivered in this branch, and no production secret-management or hardening claim.
+- IAM abuse controls and production readiness: rate limiting on register/login and refresh-token rotation are delivered (in-process limiter and opaque rotating refresh tokens, both settings-driven; see ADR 0007), and no production secret-management or hardening claim.
 
 ## Metrics
 

@@ -25,7 +25,7 @@ The status column is **independent of the horizon tags** in `PRD.md`. `Now` / `M
 | 0004 | [Own IAM as a bounded context](./0004-own-iam-context.md) | Accepted (current implementation) |
 | 0005 | [Use deterministic simulated payments](./0005-use-deterministic-simulated-payments.md) | Accepted (current implementation) |
 | 0006 | [Use a dedicated operator read model](./0006-use-dedicated-operator-read-model.md) | Accepted (current implementation) |
-| 0007 | [Harden credentials and dependencies](./0007-harden-credentials-and-dependencies.md) | Mixed (rate limiting and dependency remediation delivered; rotation decided, not merged; router bump in review) |
+| 0007 | [Harden credentials and dependencies](./0007-harden-credentials-and-dependencies.md) | Mixed (all four decisions delivered: rate limiting, dependency remediation, refresh-token rotation, router bump) |
 
 ## Interpretation
 

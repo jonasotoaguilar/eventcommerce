@@ -24,7 +24,7 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 | Subject | The JWT `sub`/`user_id` identifying the caller; commerce derives ownership from it instead of trusting client-sent IDs. | Now |
 | Bearer | The HTTP `Authorization: Bearer <access_token>` credential verified by `get_current_user` (`401` when missing, invalid, or expired). | Now |
 | Credential rate-limit budget | The in-process sliding-window allowance on the credential routes: login allows 10 attempts per account plus 60 per origin per 60-second window, registration allows 20 per origin per 60 seconds, configured through `EVENTCOMMERCE_LOGIN_RATE_LIMIT_*` / `EVENTCOMMERCE_REGISTER_RATE_LIMIT_*` and enforced in `backend/app/modules/iam/api/rate_limit.py` (`429` + `Retry-After` past the limit). Per process: more than one replica multiplies the effective budget. | Now |
-| Refresh-token family | The set of refresh tokens descended from one login, sharing one absolute expiry: exchanging a token consumes it, and replaying a consumed token revokes the whole family (see ADR 0007). Implemented on a branch that is not merged; no refresh endpoint exists in this tree. | MVP Target |
+| Refresh-token family | The set of refresh tokens descended from one login, sharing one absolute expiry: exchanging a token consumes it, and replaying a consumed token revokes the whole family (see ADR 0007). Implemented at `backend/app/modules/iam/application/refresh_tokens.py` behind `POST /api/v1/iam/refresh`. | Now |
 
 ### Bounded contexts
 
