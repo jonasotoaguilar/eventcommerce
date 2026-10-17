@@ -101,3 +101,18 @@ class SqlAlchemyInventoryRepository(InventoryRepository):
                 )
             )
         return inventory_list
+
+    async def list_by_product_ids(self, product_ids: list[str]) -> list[Inventory]:
+        if not product_ids:
+            return []
+        result = await self._session.execute(
+            select(InventoryModel).where(InventoryModel.product_id.in_(product_ids))
+        )
+        return [
+            Inventory(
+                product_id=orm.product_id,
+                available_quantity=orm.available_quantity,
+                reserved_quantity=orm.reserved_quantity,
+            )
+            for orm in result.scalars().all()
+        ]

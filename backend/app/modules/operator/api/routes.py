@@ -1,11 +1,17 @@
-"""Operator API routes (U1: read-only order queue).
+"""Operator API routes (read-only order queue and catalog).
 
-``GET /api/v1/operator/orders`` requires JWT role ``operator``
-(401 anonymous, 403 otherwise). ``status`` accepts only the five
+Both endpoints require JWT role ``operator`` (401 anonymous, 403
+otherwise).
+
+``GET /api/v1/operator/orders``: ``status`` accepts only the five
 delivered order statuses; ``created_from`` is inclusive and
 ``created_to`` is exclusive. Money is projected from the latest
 payment row per order and stays null when the order has no payment;
 ``item_count`` is the sum of line quantities.
+
+``GET /api/v1/operator/catalog``: lists inactive products too, with
+stock joined from the inventory context and null quantities when the
+product has no inventory row.
 """
 
 from collections.abc import AsyncGenerator
@@ -22,7 +28,10 @@ from app.modules.operator.api.container import (
     OperatorContainer,
     operator_container,
 )
-from app.modules.operator.api.schemas import OrderQueueRowResponse
+from app.modules.operator.api.schemas import CatalogRowResponse, OrderQueueRowResponse
+from app.modules.operator.application.list_catalog_with_stock import (
+    ListCatalogWithStock,
+)
 from app.modules.operator.application.list_order_queue import ListOrderQueue
 from app.shared.db.session import get_db_session
 
@@ -81,6 +90,35 @@ async def list_order_queue(
             item_count=row.item_count,
             total=row.total,
             currency=row.currency,
+        )
+        for row in rows
+    ]
+
+
+@router.get("/catalog")
+@inject
+async def list_catalog(
+    current: CurrentUser = Depends(require_roles(OPERATOR_ROLE)),
+    session: AsyncSession = Depends(_operator_db_session),
+    use_case: ListCatalogWithStock = Depends(
+        Provide[OperatorContainer.list_catalog_with_stock]
+    ),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[CatalogRowResponse]:
+    del current
+    del session
+    rows = await use_case.execute(limit=limit, offset=offset)
+    return [
+        CatalogRowResponse(
+            product_id=row.product_id,
+            name=row.name,
+            description=row.description,
+            price=row.price,
+            currency=row.currency,
+            active=row.active,
+            available_quantity=row.available_quantity,
+            reserved_quantity=row.reserved_quantity,
         )
         for row in rows
     ]

@@ -86,6 +86,9 @@ class _InvRepo:
             inv.product_id, inv.available_quantity, inv.reserved_quantity
         )
 
+    async def list_by_product_ids(self, product_ids: list[str]) -> list[Inventory]:
+        return [self._s[pid] for pid in product_ids if pid in self._s]
+
     async def lock_and_check_availability(self, items):  # type: ignore[no-untyped-def]
         return []
 
@@ -110,6 +113,9 @@ class _ProductRepo:
 
     async def list_active(self, limit: int = 100, offset: int = 0) -> list[Product]:
         return [p for p in self._p.values() if p.active][:limit]
+
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[Product]:
+        return list(self._p.values())[offset : offset + limit]
 
     async def save(self, product: Product) -> None:
         self._p[product.id] = product
