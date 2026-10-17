@@ -32,6 +32,10 @@ class InMemoryPaymentRepository(PaymentRepository):
     async def save(self, payment: Payment) -> None:
         self.payments.append(payment)
 
+    async def list_by_order_ids(self, order_ids: list[UUID]) -> list[Payment]:
+        wanted = set(order_ids)
+        return [p for p in self.payments if p.order_id in wanted]
+
 
 class TestProcessPaymentFailure:
     @pytest.mark.asyncio

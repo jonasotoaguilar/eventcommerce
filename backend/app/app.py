@@ -17,6 +17,8 @@ from app.modules.inventory.api.container import inventory_container
 from app.modules.inventory.api.routes import router as inventory_router
 from app.modules.notifications.api.container import notifications_container
 from app.modules.notifications.api.routes import router as notifications_router
+from app.modules.operator.api.container import operator_container
+from app.modules.operator.api.routes import router as operator_router
 from app.modules.orders.api.container import orders_container
 from app.modules.orders.api.routes import router as orders_router
 from app.modules.payments.api.container import payments_container
@@ -58,6 +60,7 @@ def create_app() -> FastAPI:
     catalog_container.wire(modules=["app.modules.catalog.api.routes"])
     cart_container.wire(modules=["app.modules.cart.api.routes"])
     iam_container.wire(modules=["app.modules.iam.api.routes"])
+    operator_container.wire(modules=["app.modules.operator.api.routes"])
 
     app = FastAPI(
         title=settings.app_name,
@@ -78,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog_router, prefix="/api/v1")
     app.include_router(cart_router, prefix="/api/v1")
     app.include_router(iam_router, prefix="/api/v1")
+    app.include_router(operator_router, prefix="/api/v1")
 
     return app
 
