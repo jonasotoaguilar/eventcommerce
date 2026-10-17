@@ -654,6 +654,123 @@ h1 {
   max-width: 24rem;
 }
 
+/* Operator catalog: real table with text-labeled status, never color-only. */
+
+.operator-table-wrap {
+  overflow-x: auto;
+  margin-top: var(--space-4);
+}
+
+.operator-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.operator-table th,
+.operator-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.operator-table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.operator-row-inactive {
+  background: var(--surface-muted);
+}
+
+.operator-cell-product {
+  font-weight: 600;
+}
+
+.operator-cell-product .product-description {
+  display: block;
+  font-weight: 400;
+  margin-top: var(--space-1);
+}
+
+.operator-availability {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+}
+
+.badge-active {
+  color: var(--success);
+  background: var(--success-subtle);
+}
+
+.badge-inactive {
+  color: var(--text-secondary);
+  background: var(--surface-muted);
+}
+
+.operator-skeleton-list {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stock-editor {
+  border-top: 1px dashed var(--border-strong);
+  padding-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stock-editor .qty-row {
+  align-items: end;
+}
+
+.stock-current {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.operator-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 32rem;
+}
+
+.operator-edit-form h3 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.field-check {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.field-check label {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.875rem;
+}
+
+.field-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  accent-color: var(--brand-primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -55,6 +55,69 @@ export interface OperatorPagination {
   offset?: number;
 }
 
+/**
+ * Partial product edit. The caller passes only the fields that changed
+ * (mirrors `ProductUpdateRequest`: every field optional); the helper
+ * forwards them untouched so a PATCH never rewrites unchanged values.
+ */
+export interface ProductUpdateChanges {
+  name?: string;
+  description?: string | null;
+  price?: number | string;
+  currency?: string;
+  active?: boolean;
+}
+
+/** Product shape returned by `PATCH /api/v1/catalog/{product_id}`. */
+export interface UpdatedProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number | string;
+  currency: string;
+  active: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+/** Stock shape returned by `POST /api/v1/inventory/{product_id}/adjust`. */
+export interface StockAdjustResponse {
+  product_id: string;
+  available_quantity: number;
+  reserved_quantity: number;
+}
+
+export type ParsedStockDelta =
+  | { ok: true; delta: number }
+  | { ok: false; error: string };
+
+/**
+ * Validate a stock delta typed by an operator. Only non-zero whole
+ * numbers reach the backend; zero and fractional input cannot express
+ * an inventory adjustment, so they fail here instead of round-tripping
+ * to a 422.
+ */
+export function parseStockDelta(raw: string): ParsedStockDelta {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return { ok: false, error: "Enter a whole number." };
+  if (!/^[+-]?\d+$/.test(trimmed))
+    return { ok: false, error: "Enter a whole number (no decimals)." };
+  const delta = Number(trimmed);
+  if (!Number.isSafeInteger(delta))
+    return { ok: false, error: "Enter a smaller whole number." };
+  if (delta === 0)
+    return { ok: false, error: "Enter a non-zero whole number." };
+  return { ok: true, delta };
+}
+
+/**
+ * Render the stock record kept after a successful adjust. Unknown
+ * previous quantities (untracked stock) render as the bare result.
+ */
+export function formatStockChange(before: number | null, after: number): string {
+  return before === null ? `${after}` : `${before} \u2192 ${after}`;
+}
+
 export interface SimulatePaymentInput {
   orderId?: string;
   amount?: string;
@@ -107,6 +170,27 @@ export function createOperatorApi(api: ApiClient) {
         currency: input.currency,
       });
       return api.get<PaymentSimulation>(`/operator/payments/simulation${query}`);
+    },
+    /**
+     * Edit a product through the delivered operator route. `changes`
+     * carries only the fields that changed; the backend PATCH accepts
+     * exactly this partial shape.
+     */
+    updateProduct(
+      productId: string,
+      changes: ProductUpdateChanges,
+    ): Promise<UpdatedProduct> {
+      return api.patch<UpdatedProduct>(
+        `/catalog/${encodeURIComponent(productId)}`,
+        changes,
+      );
+    },
+    /** Apply an operator-signed delta through the delivered adjust route. */
+    adjustStock(productId: string, delta: number): Promise<StockAdjustResponse> {
+      return api.post<StockAdjustResponse>(
+        `/inventory/${encodeURIComponent(productId)}/adjust`,
+        { delta },
+      );
     },
   };
 }
