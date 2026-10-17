@@ -16,3 +16,14 @@ class OrderQueueRowResponse(BaseModel):
     item_count: int
     total: Decimal | None
     currency: str | None
+
+
+class CatalogRowResponse(BaseModel):
+    product_id: str
+    name: str
+    description: str | None
+    price: Decimal
+    currency: str
+    active: bool
+    available_quantity: int | None
+    reserved_quantity: int | None

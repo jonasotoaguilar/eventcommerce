@@ -73,6 +73,9 @@ class FakeProductRepository:
     async def list_active(self, limit: int = 100, offset: int = 0) -> list[Product]:
         return [p for p in self._products.values() if p.active][:limit]
 
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[Product]:
+        return list(self._products.values())[offset : offset + limit]
+
     async def save(self, product: Product) -> None:
         self._products[product.id] = product
 
