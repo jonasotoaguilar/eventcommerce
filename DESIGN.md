@@ -124,12 +124,12 @@ components:
 
 # Design
 
-> **Target Design Notice**
-> This document describes the intended user experience for the eventcommerce MVP. There is no frontend implementation and the `frontend/` directory is reserved. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), orders HTTP APIs including operator-only confirm/cancel routes, and the delivered five-state event-driven order path, but all consumer-facing flows below are still target UI. Only the **Now** column in the flows and inventory below is binding today; the **MVP Target** column is the design north star for the next vertical slice. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
+> **Shopper Storefront Delivered / Operator UI Target**
+> The React/Vite shopper storefront in `frontend/` is delivered: catalog browse/detail, authenticated persisted cart, cart-backed synchronous checkout (`{cart_id}` + fresh `Idempotency-Key` per attempt), and order tracking at `/orders/:id` with the exact five statuses, chronological timeline, and manual refresh rather than live polling. The backend exposes catalog, cart, checkout (inline and `cart_id` shapes), orders HTTP APIs including operator-only confirm/cancel routes, and the delivered five-state event-driven order path. The shopper rows below describe delivered UI; operator rows remain target UI. Product scope lives in [PRD.md](./PRD.md), domain vocabulary in [docs/GLOSSARY.md](./docs/GLOSSARY.md), and decisions in the [ADR index](./docs/adr/README.md).
 
 ## Overview
 
-The design is built around two ideas: **trustworthy commerce** and **event-status transparency. Shoppers must always know what happened, what is happening, and what will happen next. Store operators must see the same truth across inventory and orders. The UI favors clear hierarchy, calm feedback, and honest labels over decorative surfaces.
+The design is built around two ideas: **trustworthy commerce** and **event-status transparency**. Shoppers must always know what happened, what is happening, and what will happen next. Store operators must see the same truth across inventory and orders. The UI favors clear hierarchy, calm feedback, and honest labels over decorative surfaces.
 
 This document owns the target screen map, user flows, visual tokens, component states, and accessibility rules. It does not duplicate event choreography or ADR rationale; those are recorded in the [ADR index](./docs/adr/README.md).
 
@@ -139,12 +139,12 @@ This document owns the target screen map, user flows, visual tokens, component s
 
 | Step | Now | MVP Target |
 |---|---|---|
-| Browse catalog | `GET /api/v1/catalog` + detail; no UI | Catalog page with filters, search, and stock signal |
-| Add to cart | Cart line API (`GET /api/v1/cart`, item add/set/remove); no UI | Cart drawer/page with line items, quantities, and subtotal |
-| Review checkout | Checkout accepts inline items or `cart_id`; no UI | Checkout summary with shipping, payment stub, and place-order CTA |
-| Place order | `POST /api/v1/checkout` (synchronous) | Same commerce path, surfaced through a checkout form |
-| View order status | `GET /api/v1/orders/{id}` (+ timeline; five-state statuses reachable via the event path) | Order tracking page with live status and timeline |
-| Receive result | Raw JSON response | In-context success, failure, or pending message |
+| Browse catalog | Catalog list and product detail pages with skeleton loading, retryable error, and empty states | Same (delivered) |
+| Add to cart | Cart page with line items, quantities, and subtotal (authenticated, persisted) | Same (delivered) |
+| Review checkout | Checkout page reviewing the persisted cart, then submitting `{cart_id}` with a fresh `Idempotency-Key` per attempt | Same (delivered) |
+| Place order | `POST /api/v1/checkout` (synchronous, terminal `confirmed`/`cancelled` in one request), surfaced through the checkout form; recoverable errors keep form state | Same commerce path, surfaced through a checkout form (delivered) |
+| View order status | Order tracking page at `/orders/:id` with exact five statuses and timeline; manual refresh, no live polling | Same (delivered) |
+| Receive result | In-context success, failure, or pending message (cancelled checkouts show cancellation copy, never success copy) | Same (delivered) |
 
 ### Store operator inventory-and-order journey
 
@@ -169,23 +169,23 @@ flowchart TD
     E -->|Still waiting| H[Show pending state]
     F --> I[Order confirmed screen]
     G --> J[Order cancelled with reason]
-    H --> K[Poll or listen for update]
+    H --> K[Manual refresh for update]
     K --> E
 ```
 
-The synchronous `POST /api/v1/checkout` compatibility boundary still returns a terminal `confirmed` or `cancelled` order in one request; the event-driven path separately walks `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`, so the `Still waiting` / poll path above now describes the async order-tracking experience (UI still MVP Target).
+The synchronous `POST /api/v1/checkout` compatibility boundary still returns a terminal `confirmed` or `cancelled` order in one request; the event-driven path separately walks `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`. The tracker never claims live updates: it offers an honest manual refresh and preserves the last good snapshot when a refresh fails.
 
 ## Screen inventory
 
 | Route / screen | Purpose | Persona | Horizon | Empty | Loading | Error | Success |
 |---|---|---|---|---|---|---|---|
-| Catalog | Browse products, see availability | Shopper | MVP Target | No products yet | Skeleton grid | Retry if fetch fails | Results rendered |
-| Cart | Review selected items before checkout | Shopper | MVP Target | Cart is empty | Spinner overlay | Item unavailable | Ready for checkout |
-| Checkout | Confirm shipping and payment stub | Shopper | MVP Target | — | Placing order… | Payment / stock failure | Order placed |
-| Order tracking | Follow order status and timeline | Shopper | MVP Target | Order not found | Loading timeline | Fetch error | Status + events shown |
-| Operator catalog | Manage products and stock | Store Operator | MVP Target | No catalog entries | Skeleton list | Save failed | Changes saved |
-| Operator orders | Review and act on order queue | Store Operator | MVP Target | No orders | Loading queue | Fetch error | Queue rendered |
-| Login / Register | Authenticate before protected flows | Shopper / Operator | MVP Target | — | Authenticating… | Invalid credentials | Logged in |
+| Catalog | Browse products, see availability | Shopper | Now (delivered) | No products yet | Skeleton grid | Retry if fetch fails | Results rendered |
+| Cart | Review selected items before checkout | Shopper | Now (delivered) | Cart is empty | Spinner overlay | Item unavailable | Ready for checkout |
+| Checkout | Review cart lines and totals, place the order | Shopper | Now (delivered) | — | Placing order… | Payment / stock failure | Order placed |
+| Order tracking | Follow order status and timeline | Shopper | Now (delivered) | Order not found | Loading timeline | Fetch error | Status + events shown |
+| Operator catalog | Manage products and stock | Store Operator | Future | No catalog entries | Skeleton list | Save failed | Changes saved |
+| Operator orders | Review and act on order queue | Store Operator | Future | No orders | Loading queue | Fetch error | Queue rendered |
+| Login / Register | Authenticate before protected flows | Shopper | Now (delivered) | — | Authenticating… | Invalid credentials | Logged in |
 
 ## Colors
 
@@ -221,7 +221,7 @@ The type scale is designed for scanning.
 - **Breakpoints** are `sm: 640px`, `md: 768px`, `lg: 1024px`, `xl: 1280px`.
 - Catalog grids go from 1 column on mobile to 2 on `sm`, 3 on `md`, 4 on `lg`.
 - Tables become horizontally scrollable containers below `md` rather than being reflowed into cards.
-- Checkout forms stack fields on mobile and split into two columns at `lg`.
+- Forms stack fields on mobile and split into two columns at `lg`.
 
 ## States
 
@@ -263,13 +263,13 @@ Never describe an unwired consumer or partial backend flow as if it were live in
 
 ## Components
 
-Components are described by responsibility and states, not by framework-specific implementation. Concrete framework choices are deferred to the `add-frontend-mvp` follow-up.
+Components are described by responsibility and states, not by framework-specific implementation. The delivered shopper UI implements them in React/Vite under `frontend/src/` (auth session, route-guarded pages, `ProductCard`, `CartLineRow`, `CheckoutSummary`, `StatusBadge`, `OrderTimeline`).
 
 - **Button**: primary, secondary, danger, ghost variants; loading state with `aria-busy`.
 - **StatusBadge**: maps to `pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`; includes icon + text.
 - **ProductCard**: image, name, price, availability signal, add-to-cart action; empty/loading/error/success states.
 - **CartLine**: product snapshot, quantity stepper, remove action, subtotal.
-- **CheckoutSummary**: cart lines, totals, payment stub selector, place-order CTA, validation errors.
+- **CheckoutSummary**: cart lines, totals, place-order CTA, validation errors.
 - **OrderTimeline**: chronological event list using the canonical event vocabulary from [docs/GLOSSARY.md](./docs/GLOSSARY.md).
 - **OperatorOrderRow**: order id, customer, total, status badge, confirm/cancel actions; disabled when action is in flight.
 - **StockEditor**: current quantity, delta input, save action, event log preview.
@@ -280,7 +280,7 @@ Components are described by responsibility and states, not by framework-specific
 - **Do** show the same order status to the shopper and the operator; a single source of truth builds trust.
 - **Do** reserve primary color for the main action on a screen; do not paint every CTA primary.
 - **Do** provide an empty state with a clear next action instead of a blank area.
-- **Don't** use present-tense claims for screens marked MVP Target or Future.
+- **Do** present delivered shopper screens in the present tense; keep present-tense claims off screens marked Future.
 - **Don't** duplicate backend topology diagrams.
 - **Don't** rely on color alone to communicate status; pair it with text and icons.
-- **Don't** block the shopper on polling if the backend consumer is not yet live; surface the honest pending state instead.
+- **Don't** claim live polling on the tracker; the delivered experience is manual refresh with the last good snapshot preserved on refresh failure.

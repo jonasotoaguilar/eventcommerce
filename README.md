@@ -17,20 +17,23 @@ A product-quality portfolio project: a modular, event-driven commerce backend th
 - IAM bounded context (`backend/app/modules/iam/`): `POST /api/v1/iam/register` (shopper-only, `201`/`409`), `POST /api/v1/iam/login` (30-minute HS256 access JWT, generic `401`), and `GET /api/v1/iam/me` (bearer, `200`/`401`); commerce routes enforce owner-or-operator access from the JWT subject.
 - Catalog bounded context (`backend/app/modules/catalog/`): public `GET /api/v1/catalog` (active-only browse) and `GET /api/v1/catalog/{product_id}` (detail; missing and inactive share one `404`), plus operator `POST /api/v1/catalog` / `PATCH /api/v1/catalog/{product_id}` product management. Catalog creation seeds an inventory row at zero stock; operators adjust stock via `POST /api/v1/inventory/{product_id}/adjust`.
 - Cart bounded context (`backend/app/modules/cart/`): `GET /api/v1/cart` (lazily created), `POST /api/v1/cart/items`, `PATCH` / `DELETE /api/v1/cart/items/{product_id}` — one persisted cart per authenticated shopper, owner-scoped by the JWT subject, with live subtotal from active catalog prices. Checkout accepts an optional `cart_id` and derives lines, amount, and currency from authoritative catalog pricing; the inline `{items, amount, currency}` shape remains supported.
-- **Not yet**: the storefront frontend (the five-state lifecycle and confirm/cancel routes are delivered; see below).
+- Shopper storefront in `frontend/` (React/Vite): catalog browse/detail over `GET /api/v1/catalog`, authenticated persisted cart over the cart API, cart-backed synchronous checkout (`{cart_id}` + fresh `Idempotency-Key` per attempt, terminal `confirmed`/`cancelled` in one request), and order tracking at `/orders/:id` with the exact five statuses (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`), chronological timeline, and manual refresh rather than live polling. Auth shell with login/register and route-guarded shopper pages; JWT subject stays authoritative for ownership.
 
 ### MVP Target
 
-The remaining commerce journey on a single event-driven backend:
+The shopper storefront is delivered (see Now): catalog browse/detail, authenticated cart, cart-backed synchronous checkout with idempotency, and order tracking across the five-state lifecycle with manual refresh.
 
-- Storefront UI over the delivered catalog/cart/checkout/orders backend (browse, cart, checkout form, order tracking across the five-state lifecycle).
+The remaining commerce work is operator-facing and production hardening:
+
+- Operator UI over the delivered catalog/inventory/orders APIs (catalog list with edit and stock-adjust actions, order queue with confirm/cancel).
 - The event-driven order path is delivered: `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled` via choreography, with catalog-derived payment authorization, terminal notifications, operator-only confirm/cancel routes, and the synchronous checkout compatibility boundary preserved.
 
 ### Future
 
 - Real payment provider adapter.
 - Saga orchestration and dead-letter handling.
-- Observability stack, runbooks, and a storefront frontend.
+- Observability stack, runbooks, and production deployment.
+- Operator UI.
 
 ## Five-minute path
 
@@ -48,7 +51,7 @@ The remaining commerce journey on a single event-driven backend:
 | `backend/alembic/` | Database migrations |
 | `docs/` | Glossary and Architecture Decision Records |
 | `openspec/` | SDD change specifications and tasks |
-| `frontend/` | Reserved for future frontend work (not created yet) |
+| `frontend/` | React/Vite shopper storefront (catalog, cart, checkout, order tracking) |
 | `.github/` | CI and PR templates |
 
 ## Documentation index

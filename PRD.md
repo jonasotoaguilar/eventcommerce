@@ -36,11 +36,11 @@ Event-driven systems quickly become hard to reason about when vocabulary, owners
 - Catalog bounded context (`backend/app/modules/catalog/`): public `GET /api/v1/catalog` (active-only browse) and `GET /api/v1/catalog/{product_id}` (detail; missing and inactive share one `404`), plus operator `POST /api/v1/catalog` / `PATCH /api/v1/catalog/{product_id}` product management. Catalog creation seeds an inventory row at zero stock; operators adjust stock via `POST /api/v1/inventory/{product_id}/adjust`.
 - Cart bounded context (`backend/app/modules/cart/`): `GET /api/v1/cart` (lazily created), `POST /api/v1/cart/items`, `PATCH` / `DELETE /api/v1/cart/items/{product_id}` — one persisted cart per authenticated shopper, owner-scoped by the JWT subject, with live subtotal from active catalog prices.
 - Checkout accepts either the inline `{items, amount, currency}` shape or an optional `cart_id` alone, deriving lines, amount, and currency from authoritative catalog pricing; the JWT subject stays authoritative for ownership.
-- **Not yet**: the storefront frontend (five-state lifecycle and confirm/cancel routes delivered).
+- Shopper storefront in `frontend/` (React/Vite): catalog browse/detail, authenticated persisted cart, cart-backed synchronous checkout (`{cart_id}` alone with a fresh `Idempotency-Key` per attempt; terminal `confirmed`/`cancelled` in one request; form state preserved through recoverable 404/409/422/500 errors), and order tracking at `/orders/:id` with the exact five statuses, chronological timeline, cancellation reason, and manual refresh rather than live polling. Auth shell with login/register and route-guarded shopper pages.
 
 ## MVP Target
 
-The remaining journey on a single event-driven backend. Checkout (inline and `cart_id` shapes), deterministic simulated payments, catalog browse/manage, owner-scoped carts, the shared event/outbox/idempotency primitives, IAM (register/login/me with shopper-only registration, 30-minute access JWT, and owner-or-operator commerce protection), the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ), and the five-state order lifecycle with confirm/cancel routes are already delivered (see [Now](#now)); the following close out the MVP:
+The shopper journey is delivered on a single event-driven backend. Checkout (inline and `cart_id` shapes), deterministic simulated payments, catalog browse/manage, owner-scoped carts, the shared event/outbox/idempotency primitives, IAM (register/login/me with shopper-only registration, 30-minute access JWT, and owner-or-operator commerce protection), the messaging runtime (outbox scheduler + RabbitMQ publisher + AMQP consumer wired into the app lifespan; live delivery requires RabbitMQ), the five-state order lifecycle with confirm/cancel routes, and the React/Vite shopper storefront (catalog browse/detail, authenticated cart, cart-backed synchronous checkout with per-attempt idempotency, order tracking with exact five statuses/timeline and manual refresh) are already delivered (see [Now](#now)); the following close out the MVP:
 
 - **Orders** reach the full five-state lifecycle (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`) driven by event choreography, with operator-only confirm/cancel routes. (Delivered)
 - **Inventory** reserves and releases stock across the five-state lifecycle, including payment-rejection compensation. (Delivered)
@@ -50,7 +50,7 @@ The remaining journey on a single event-driven backend. Checkout (inline and `ca
 
 - Real payment provider adapter.
 - Saga orchestration and dead-letter handling.
-- Observability stack, runbooks, and a frontend storefront.
+- Observability stack, runbooks, production deployment, and operator UI.
 
 ## Business Rules
 
@@ -66,7 +66,7 @@ The remaining journey on a single event-driven backend. Checkout (inline and `ca
 
 - Real card processing or PCI compliance in the MVP.
 - Production deployment/operations of the AMQP runtime (wired runtime delivered; live delivery requires RabbitMQ; gated CI proves integration; no production SLA/ops, DLQ, saga, observability, or payment-consumer claim).
-- Web storefront, mobile app, or public SaaS operations.
+- Operator UI, mobile app, or public SaaS operations.
 - Production-grade observability, SLA guarantees, or multi-region deployment.
 - Saga orchestration and dead-letter queues before the payment flow is stable.
 - IAM abuse controls and production readiness: no rate limiting on register/login, no refresh-token rotation, and no production secret-management or hardening claim.
