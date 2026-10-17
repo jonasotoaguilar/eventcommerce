@@ -1,6 +1,7 @@
-# EventCommerce Storefront (shopper)
+# EventCommerce Storefront
 
-Shopper-facing React + Vite + TypeScript app. The completed shopper slice
+React + Vite + TypeScript app serving two surfaces behind the same client:
+the shopper journey and the operator console. The completed shopper slice
 covers the full browse-to-track journey:
 
 - Public catalog and product detail (`/`, `/catalog`, `/catalog/:id`).
@@ -16,6 +17,13 @@ covers the full browse-to-track journey:
   `payment_authorized`, `confirmed`, `cancelled`) with status badge,
   cancellation reason, chronological timeline, polite `aria-live` status
   updates, and an honest manual refresh control.
+
+The operator console (`/operator`, behind `OperatorRoute` and the `operator`
+role) covers catalog browsing with stock editing (`/operator/catalog`), the
+order queue with confirm/cancel (`/operator/orders`), and the deterministic
+payment simulation panel (`/operator/payments`). The three screens read
+`GET /api/v1/operator/*` and reuse the delivered catalog, inventory and
+orders write routes instead of operator-only writes.
 
 ## Prerequisites
 
@@ -42,9 +50,9 @@ npm run build
 
 - Auth token persists in `localStorage` (`eventcommerce.auth.token`); expired
   tokens are dropped and 401 responses return the shopper to `/login`.
-- No operator screens, no live transport (websockets/SSE), and no automatic
-  polling in this slice (shopper scope only): order progress is async on the
-  server and the tracker refreshes manually.
+- No live transport (websockets/SSE) and no automatic polling: the tracker
+  refreshes manually, and the operator screens reload when they open or after
+  an action.
 - No `.env` file is needed: the API base defaults to same-origin `/api/v1`
   and the dev proxy forwards `/api` to `http://localhost:8000`.
 - Future work stays outside this slice: real payments, saga-DLQ handling,

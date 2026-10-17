@@ -20,7 +20,7 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 | Deterministic simulated payment | A payment provider that returns the same authorization result for the same inputs. Implemented in `backend/app/modules/payments/domain/policy.py` (ADR 0005). | Now |
 | Principal | The authenticated caller carried as `CurrentUser` after bearer verification (`backend/app/modules/iam/api/dependencies.py`, `backend/app/modules/iam/application/tokens.py`). | Now |
 | Shopper | The default role assigned at registration (`backend/app/modules/iam/application/register_user.py`); owns only its own commerce resources. | Now |
-| Operator | The privileged role allowed alongside the owner on commerce reads and required alone on `POST /api/v1/orders/{order_id}/confirm` and `POST /api/v1/orders/{order_id}/cancel` (`backend/app/modules/orders/api/routes.py`). | Now |
+| Operator | The privileged role allowed alongside the owner on commerce reads, required alone on `POST /api/v1/orders/{order_id}/confirm` and `POST /api/v1/orders/{order_id}/cancel` (`backend/app/modules/orders/api/routes.py`), and required alone on the `GET /api/v1/operator/*` reads (`backend/app/modules/operator/api/routes.py`) backing the delivered operator console (catalog with stock editing, order queue with confirm/cancel, payment simulation panel; on-demand reads, no dashboards, analytics, or user administration). | Now |
 | Subject | The JWT `sub`/`user_id` identifying the caller; commerce derives ownership from it instead of trusting client-sent IDs. | Now |
 | Bearer | The HTTP `Authorization: Bearer <access_token>` credential verified by `get_current_user` (`401` when missing, invalid, or expired). | Now |
 
@@ -36,6 +36,7 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 - `iam` — JWT authentication and role authorization.
 - `catalog` — product browsing (public active-only) and operator product management; creation seeds the inventory row.
 - `cart` — one persisted cart per authenticated shopper with live subtotal from catalog prices.
+- `operator` — read-only console support (`GET /api/v1/operator/orders`, `GET /api/v1/operator/catalog`, `GET /api/v1/operator/payments/simulation`); queue totals are projected from the latest payment per order and stay `null` when the order has no payment.
 
 **Target contexts** (MVP): no new bounded contexts remain; the five-state `orders` lifecycle is delivered (see Order status).
 
