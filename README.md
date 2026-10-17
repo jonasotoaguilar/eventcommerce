@@ -18,22 +18,22 @@ A product-quality portfolio project: a modular, event-driven commerce backend th
 - Catalog bounded context (`backend/app/modules/catalog/`): public `GET /api/v1/catalog` (active-only browse) and `GET /api/v1/catalog/{product_id}` (detail; missing and inactive share one `404`), plus operator `POST /api/v1/catalog` / `PATCH /api/v1/catalog/{product_id}` product management. Catalog creation seeds an inventory row at zero stock; operators adjust stock via `POST /api/v1/inventory/{product_id}/adjust`.
 - Cart bounded context (`backend/app/modules/cart/`): `GET /api/v1/cart` (lazily created), `POST /api/v1/cart/items`, `PATCH` / `DELETE /api/v1/cart/items/{product_id}` — one persisted cart per authenticated shopper, owner-scoped by the JWT subject, with live subtotal from active catalog prices. Checkout accepts an optional `cart_id` and derives lines, amount, and currency from authoritative catalog pricing; the inline `{items, amount, currency}` shape remains supported.
 - Shopper storefront in `frontend/` (React/Vite): catalog browse/detail over `GET /api/v1/catalog`, authenticated persisted cart over the cart API, cart-backed synchronous checkout (`{cart_id}` + fresh `Idempotency-Key` per attempt, terminal `confirmed`/`cancelled` in one request), and order tracking at `/orders/:id` with the exact five statuses (`pending`, `inventory_reserved`, `payment_authorized`, `confirmed`, `cancelled`), chronological timeline, and manual refresh rather than live polling. Auth shell with login/register and route-guarded shopper pages; JWT subject stays authoritative for ownership.
+- Operator read model (`backend/app/modules/operator/`, read-only, `operator` role required): `GET /api/v1/operator/orders` (order queue with `status` limited to the five order statuses, `created_from` inclusive, `created_to` exclusive, `limit` 1..200 default 100, `offset` >= 0; each row carries `order_id`, `customer_id`, `status`, `created_at`, `cancel_reason`, `item_count` as summed line quantities, plus `total`/`currency` projected from the latest payment by `(created_at, id)` and `null` when the order has no payment), `GET /api/v1/operator/catalog` (every product including inactive ones ordered by product id, with `available_quantity`/`reserved_quantity` joined from inventory and `null` when the product has no inventory row; same `limit`/`offset` bounds), and `GET /api/v1/operator/payments/simulation` (deterministic decision for `order_id`, `amount` in (0, 999999999.99] with at most two decimals, and a 3-letter `currency`; returns `approved`, `digest_byte`, and `approval_threshold` without touching storage). Anonymous callers get `401`, non-operators get `403`, and unknown `status` or malformed dates get `422`. Operator writes reuse the delivered routes: `PATCH /api/v1/catalog/{product_id}`, `POST /api/v1/inventory/{product_id}/adjust`, and `POST /api/v1/orders/{order_id}/confirm|cancel`.
+- Operator console in `frontend/` (`/operator/catalog`, `/operator/orders`, `/operator/payments` behind the `operator` role with `OperatorRoute`): catalog list with edit and stock-adjust actions, order queue with confirm/cancel, and payment simulation panel. On-demand reads with manual refresh rather than live updates; no dashboards, analytics, or user administration.
 
 ### MVP Target
 
 The shopper storefront is delivered (see Now): catalog browse/detail, authenticated cart, cart-backed synchronous checkout with idempotency, and order tracking across the five-state lifecycle with manual refresh.
 
-The remaining commerce work is operator-facing and production hardening:
+The operator console is delivered (see Now): catalog list with edit and stock-adjust actions, order queue with confirm/cancel, and payment simulation panel over the three operator reads.
 
-- Operator UI over the delivered catalog/inventory/orders APIs (catalog list with edit and stock-adjust actions, order queue with confirm/cancel).
-- The event-driven order path is delivered: `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled` via choreography, with catalog-derived payment authorization, terminal notifications, operator-only confirm/cancel routes, and the synchronous checkout compatibility boundary preserved.
+The remaining work is not operator-facing: the event-driven order path is delivered — `pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled` via choreography, with catalog-derived payment authorization, terminal notifications, operator-only confirm/cancel routes, and the synchronous checkout compatibility boundary preserved. What remains is production hardening.
 
 ### Future
 
 - Real payment provider adapter.
 - Saga orchestration and dead-letter handling.
 - Observability stack, runbooks, and production deployment.
-- Operator UI.
 
 ## Five-minute path
 

@@ -50,6 +50,12 @@ class SqlAlchemyProductRepository(ProductRepository):
         )
         return [self._to_domain(orm) for orm in result.scalars().all()]
 
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[Product]:
+        result = await self._session.execute(
+            select(ProductModel).order_by(ProductModel.id).limit(limit).offset(offset)
+        )
+        return [self._to_domain(orm) for orm in result.scalars().all()]
+
     async def save(self, product: Product) -> None:
         result = await self._session.execute(
             select(ProductModel).where(ProductModel.id == product.id)

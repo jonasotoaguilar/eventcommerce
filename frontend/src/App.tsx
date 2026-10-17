@@ -6,9 +6,13 @@ import { CatalogPage } from "./pages/CatalogPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { OperatorCatalogPage } from "./pages/OperatorCatalogPage";
+import { OperatorOrdersPage } from "./pages/OperatorOrdersPage";
+import { OperatorPaymentsPage } from "./pages/OperatorPaymentsPage";
 import { OrderTrackingPage } from "./pages/OrderTrackingPage";
 import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { OperatorRoute } from "./routes/OperatorRoute";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 
 /**
@@ -47,6 +51,30 @@ export function App() {
                 <ProtectedRoute>
                   <OrderTrackingPage />
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/operator/catalog"
+              element={
+                <OperatorRoute>
+                  <OperatorCatalogPage />
+                </OperatorRoute>
+              }
+            />
+            <Route
+              path="/operator/orders"
+              element={
+                <OperatorRoute>
+                  <OperatorOrdersPage />
+                </OperatorRoute>
+              }
+            />
+            <Route
+              path="/operator/payments"
+              element={
+                <OperatorRoute>
+                  <OperatorPaymentsPage />
+                </OperatorRoute>
               }
             />
             <Route path="/login" element={<LoginPage />} />

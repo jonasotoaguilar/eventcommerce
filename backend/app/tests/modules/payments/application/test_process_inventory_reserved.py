@@ -44,6 +44,24 @@ class FakeOrderRepository:
     async def save(self, order: Order) -> None:  # pragma: no cover
         raise AssertionError("payment must never save orders")
 
+    async def list_queue(
+        self,
+        status: str | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Order]:
+        rows = [
+            o
+            for o in self._orders.values()
+            if (status is None or o.status == status)
+            and (created_from is None or o.created_at >= created_from)
+            and (created_to is None or o.created_at < created_to)
+        ]
+        rows.sort(key=lambda o: (o.created_at, o.id))
+        return rows[offset : offset + limit]
+
 
 class FakeProductRepository:
     def __init__(self, products: dict[str, Product]) -> None:
@@ -54,6 +72,9 @@ class FakeProductRepository:
 
     async def list_active(self, limit: int = 100, offset: int = 0) -> list[Product]:
         return [p for p in self._products.values() if p.active][:limit]
+
+    async def list_all(self, limit: int = 100, offset: int = 0) -> list[Product]:
+        return list(self._products.values())[offset : offset + limit]
 
     async def save(self, product: Product) -> None:
         self._products[product.id] = product
@@ -71,6 +92,10 @@ class InMemoryPaymentRepository(PaymentRepository):
 
     async def save(self, payment: Payment) -> None:
         self.payments.append(payment)
+
+    async def list_by_order_ids(self, order_ids: list[UUID]) -> list[Payment]:
+        wanted = set(order_ids)
+        return [p for p in self.payments if p.order_id in wanted]
 
 
 class FakeOutbox:
