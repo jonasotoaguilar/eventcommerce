@@ -347,7 +347,9 @@ class TestConcurrentRefresh:
         async with factory() as seed:
             users = SqlAlchemyUserRepository(seed)
             tokens = SqlAlchemyRefreshTokenRepository(seed)
-            user = await register_user(users, "revoked-race@example.com", "valid-pass-1")
+            user = await register_user(
+                users, "revoked-race@example.com", "valid-pass-1"
+            )
             raw = await issue_refresh_token(tokens, user.id, settings=test_settings)
             stored = await tokens.get_by_hash(_digest(raw))
             assert stored is not None
