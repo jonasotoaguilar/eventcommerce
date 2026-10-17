@@ -50,8 +50,7 @@ The remaining work is not operator-facing: the event-driven order path is delive
 | `backend/app/` | FastAPI / SQLAlchemy 2 async backend with bounded contexts |
 | `backend/alembic/` | Database migrations |
 | `docs/` | Glossary and Architecture Decision Records |
-| `openspec/` | SDD change specifications and tasks |
-| `frontend/` | React/Vite shopper storefront (catalog, cart, checkout, order tracking) |
+| `frontend/` | React/Vite shopper storefront (catalog, cart, checkout, order tracking, operator console) |
 | `.github/` | CI and PR templates |
 
 ## Documentation index
@@ -65,4 +64,4 @@ The remaining work is not operator-facing: the event-driven order path is delive
 
 ## Contributing
 
-Work is planned and tracked through SDD changes under `openspec/changes/`. Before proposing a code change, open or review the relevant SDD change and make sure your work aligns with the current foundation documents.
+Work is proposed through GitHub issues and tracked in pull requests: a pull request must reference an issue carrying the `status:approved` label and must carry exactly one `type:*` label, both enforced in CI. Keep the change aligned with the foundation documents above.
