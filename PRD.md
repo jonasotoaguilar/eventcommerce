@@ -77,7 +77,7 @@ The shopper journey is delivered on a single event-driven backend. Checkout (inl
 - **Order state correctness** (Now): 100% of simulated orders end in a valid terminal state following the transitions in `backend/app/modules/orders/domain/services.py` (`pending` → `inventory_reserved` → `payment_authorized` → `confirmed`/`cancelled`, with the synchronous `pending` → `confirmed` shortcut and idempotent self-transitions).
 - **Payment simulation reproducibility** (Now): a fixed input set produces the same authorization result across repeated runs.
 - **Consumer idempotency** (Now: checkout path and wired AMQP handlers): replaying an `Idempotency-Key` or redelivering a wired event produces no duplicate order, inventory, or payment records; proven broker-free by `backend/app/tests/runtime/test_chain_e2e.py`, live delivery requires RabbitMQ.
-- **End-to-end checkout latency** (MVP Target): p95 under 500 ms for the deterministic MVP path in local tests; benchmark evidence is not yet produced.
+- **End-to-end checkout latency** (MVP Target): p95 under 500 ms for the deterministic MVP path in local tests; benchmark evidence in `docs/BENCHMARK.md` (recorded local run: p95 96.70 ms over the 43 confirmed samples of 50 attempts, verdict PASS).
 
 ## Glossary
 
