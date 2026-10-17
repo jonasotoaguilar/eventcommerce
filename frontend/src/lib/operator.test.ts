@@ -1,3 +1,4 @@
+import { exclusiveEndOfDay } from "./operator";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, type ApiClient } from "./api-client";
 import {
@@ -5,6 +6,7 @@ import {
   formatStockChange,
   isOperator,
   parseStockDelta,
+  validateCancelReason,
 } from "./operator";
 
 function stubApi() {
@@ -18,13 +20,21 @@ function stubApi() {
 describe("isOperator", () => {
   it("accepts a user with the operator role", () => {
     expect(
-      isOperator({ user_id: "op-1", email: "op@example.com", role: "operator" }),
+      isOperator({
+        user_id: "op-1",
+        email: "op@example.com",
+        role: "operator",
+      }),
     ).toBe(true);
   });
 
   it("rejects a shopper", () => {
     expect(
-      isOperator({ user_id: "shop-1", email: "shop@example.com", role: "shopper" }),
+      isOperator({
+        user_id: "shop-1",
+        email: "shop@example.com",
+        role: "shopper",
+      }),
     ).toBe(false);
   });
 
@@ -58,7 +68,9 @@ describe("createOperatorApi", () => {
   it("omits absent order filters instead of sending empty values", async () => {
     const { api, get } = stubApi();
     await createOperatorApi(api).listOrders({ status: "pending", limit: 25 });
-    expect(get).toHaveBeenCalledWith("/operator/orders?status=pending&limit=25");
+    expect(get).toHaveBeenCalledWith(
+      "/operator/orders?status=pending&limit=25",
+    );
   });
 
   it("URL-encodes order filter values", async () => {
@@ -99,7 +111,9 @@ describe("createOperatorApi", () => {
   it("omits absent simulation inputs instead of sending empty values", async () => {
     const { api, get } = stubApi();
     await createOperatorApi(api).simulatePayment({ currency: "USD" });
-    expect(get).toHaveBeenCalledWith("/operator/payments/simulation?currency=USD");
+    expect(get).toHaveBeenCalledWith(
+      "/operator/payments/simulation?currency=USD",
+    );
   });
 
   it("propagates ApiError from the order queue read", async () => {
@@ -173,22 +187,90 @@ describe("adjustStock", () => {
     const { api, post } = stubApi();
     await createOperatorApi(api).adjustStock("prod 1", 5);
     expect(post).toHaveBeenCalledOnce();
-    expect(post).toHaveBeenCalledWith("/inventory/prod%201/adjust", { delta: 5 });
+    expect(post).toHaveBeenCalledWith("/inventory/prod%201/adjust", {
+      delta: 5,
+    });
   });
 
   it("posts negative deltas unchanged", async () => {
     const { api, post } = stubApi();
     await createOperatorApi(api).adjustStock("prod-1", -3);
-    expect(post).toHaveBeenCalledWith("/inventory/prod-1/adjust", { delta: -3 });
+    expect(post).toHaveBeenCalledWith("/inventory/prod-1/adjust", {
+      delta: -3,
+    });
   });
 
   it("propagates ApiError from the stock write", async () => {
     const { api, post } = stubApi();
     const failure = new ApiError(422, "Insufficient stock");
     post.mockRejectedValueOnce(failure);
-    await expect(createOperatorApi(api).adjustStock("prod-1", -50)).rejects.toBe(
+    await expect(
+      createOperatorApi(api).adjustStock("prod-1", -50),
+    ).rejects.toBe(failure);
+  });
+});
+
+describe("validateCancelReason", () => {
+  it("accepts a valid reason and trims surrounding whitespace", () => {
+    expect(validateCancelReason("  out of stock ")).toEqual({
+      ok: true,
+      reason: "out of stock",
+    });
+  });
+
+  it("rejects an empty reason", () => {
+    const result = validateCancelReason("   ");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/reason/i);
+  });
+
+  it("rejects a reason longer than 128 characters", () => {
+    const result = validateCancelReason("r".repeat(129));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/128/);
+  });
+
+  it("accepts a reason of exactly 128 characters", () => {
+    const reason = "r".repeat(128);
+    expect(validateCancelReason(reason)).toEqual({ ok: true, reason });
+  });
+});
+
+describe("confirmOrder", () => {
+  it("posts to the encoded confirm path without a body", async () => {
+    const { api, post } = stubApi();
+    await createOperatorApi(api).confirmOrder("order 1/x");
+    expect(post).toHaveBeenCalledOnce();
+    expect(post).toHaveBeenCalledWith("/orders/order%201%2Fx/confirm");
+  });
+
+  it("propagates ApiError from the confirm action", async () => {
+    const { api, post } = stubApi();
+    const failure = new ApiError(409, "Order cannot be confirmed.");
+    post.mockRejectedValueOnce(failure);
+    await expect(createOperatorApi(api).confirmOrder("order-1")).rejects.toBe(
       failure,
     );
+  });
+});
+
+describe("cancelOrder", () => {
+  it("posts the reason to the encoded cancel path", async () => {
+    const { api, post } = stubApi();
+    await createOperatorApi(api).cancelOrder("order 1/x", "out of stock");
+    expect(post).toHaveBeenCalledOnce();
+    expect(post).toHaveBeenCalledWith("/orders/order%201%2Fx/cancel", {
+      reason: "out of stock",
+    });
+  });
+
+  it("propagates ApiError from the cancel action", async () => {
+    const { api, post } = stubApi();
+    const failure = new ApiError(409, "Order cannot be cancelled.");
+    post.mockRejectedValueOnce(failure);
+    await expect(
+      createOperatorApi(api).cancelOrder("order-1", "out of stock"),
+    ).rejects.toBe(failure);
   });
 });
 
@@ -228,5 +310,20 @@ describe("formatStockChange", () => {
 
   it("renders only the result when the previous quantity is unknown", () => {
     expect(formatStockChange(null, 5)).toBe("5");
+  });
+});
+
+describe("exclusiveEndOfDay", () => {
+  it("maps a date input to the next midnight so the day stays included", () => {
+    expect(exclusiveEndOfDay("2024-05-02")).toBe("2024-05-03T00:00:00");
+  });
+
+  it("rolls over at month and year boundaries", () => {
+    expect(exclusiveEndOfDay("2024-05-31")).toBe("2024-06-01T00:00:00");
+    expect(exclusiveEndOfDay("2024-12-31")).toBe("2025-01-01T00:00:00");
+  });
+
+  it("leaves an unusable value untouched", () => {
+    expect(exclusiveEndOfDay("not-a-date")).toBe("not-a-date");
   });
 });
