@@ -6,8 +6,8 @@ uppercase ASCII letters, no catalog existence check), ``amount`` with more
 than two decimals, and missing fields, while a fully valid request passes
 through (the 201-class pass-through at schema level).
 
-Task 3.13 (GREEN): pins every approved contract constraint from
-``openspec/changes/checkout-end-to-end/design.md`` — customer/product IDs
+Task 3.13 (GREEN): pins every approved contract constraint from the checkout
+contract design — customer/product IDs
 1-128 chars, 1-100 unique items, quantity 1-10,000, amount Decimal
 0-999,999,999.99 with at most two decimals, currency normalized then
 validated as three uppercase ASCII letters, optional visible-ASCII
