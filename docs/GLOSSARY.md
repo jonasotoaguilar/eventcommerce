@@ -23,6 +23,8 @@ Canonical domain and event vocabulary for `eventcommerce`. Use this document to 
 | Operator | The privileged role allowed alongside the owner on commerce reads, required alone on `POST /api/v1/orders/{order_id}/confirm` and `POST /api/v1/orders/{order_id}/cancel` (`backend/app/modules/orders/api/routes.py`), and required alone on the `GET /api/v1/operator/*` reads (`backend/app/modules/operator/api/routes.py`) backing the delivered operator console (catalog with stock editing, order queue with confirm/cancel, payment simulation panel; on-demand reads, no dashboards, analytics, or user administration). | Now |
 | Subject | The JWT `sub`/`user_id` identifying the caller; commerce derives ownership from it instead of trusting client-sent IDs. | Now |
 | Bearer | The HTTP `Authorization: Bearer <access_token>` credential verified by `get_current_user` (`401` when missing, invalid, or expired). | Now |
+| Credential rate-limit budget | The in-process sliding-window allowance on the credential routes: login allows 10 attempts per account plus 60 per origin per 60-second window, registration allows 20 per origin per 60 seconds, configured through `EVENTCOMMERCE_LOGIN_RATE_LIMIT_*` / `EVENTCOMMERCE_REGISTER_RATE_LIMIT_*` and enforced in `backend/app/modules/iam/api/rate_limit.py` (`429` + `Retry-After` past the limit). Per process: more than one replica multiplies the effective budget. | Now |
+| Refresh-token family | The set of refresh tokens descended from one login, sharing one absolute expiry: exchanging a token consumes it, and replaying a consumed token revokes the whole family (see ADR 0007). Implemented on a branch that is not merged; no refresh endpoint exists in this tree. | MVP Target |
 
 ### Bounded contexts
 
