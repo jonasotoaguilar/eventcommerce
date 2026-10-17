@@ -87,9 +87,43 @@ export interface StockAdjustResponse {
   reserved_quantity: number;
 }
 
+/** Order shape returned by `POST /api/v1/orders/{order_id}/confirm`. */
+export interface ConfirmedOrder {
+  order_id: string;
+  status: string;
+}
+
+/** Order shape returned by `POST /api/v1/orders/{order_id}/cancel`. */
+export interface CancelledOrder {
+  order_id: string;
+  status: string;
+  cancel_reason: string | null;
+}
+
+/** Backend bound for the cancel reason (`OrderCancelRequest`). */
+export const MAX_CANCEL_REASON_LENGTH = 128;
+
+export type ValidatedCancelReason =
+  { ok: true; reason: string } | { ok: false; error: string };
+
+/**
+ * Validate a cancel reason typed by an operator. Empty and over-long
+ * reasons fail here instead of round-tripping to a 422.
+ */
+export function validateCancelReason(raw: string): ValidatedCancelReason {
+  const reason = raw.trim();
+  if (reason.length === 0)
+    return { ok: false, error: "Enter a cancel reason." };
+  if (reason.length > MAX_CANCEL_REASON_LENGTH)
+    return {
+      ok: false,
+      error: `Keep the reason to ${MAX_CANCEL_REASON_LENGTH} characters or fewer.`,
+    };
+  return { ok: true, reason };
+}
+
 export type ParsedStockDelta =
-  | { ok: true; delta: number }
-  | { ok: false; error: string };
+  { ok: true; delta: number } | { ok: false; error: string };
 
 /**
  * Validate a stock delta typed by an operator. Only non-zero whole
@@ -99,7 +133,8 @@ export type ParsedStockDelta =
  */
 export function parseStockDelta(raw: string): ParsedStockDelta {
   const trimmed = raw.trim();
-  if (trimmed.length === 0) return { ok: false, error: "Enter a whole number." };
+  if (trimmed.length === 0)
+    return { ok: false, error: "Enter a whole number." };
   if (!/^[+-]?\d+$/.test(trimmed))
     return { ok: false, error: "Enter a whole number (no decimals)." };
   const delta = Number(trimmed);
@@ -114,7 +149,10 @@ export function parseStockDelta(raw: string): ParsedStockDelta {
  * Render the stock record kept after a successful adjust. Unknown
  * previous quantities (untracked stock) render as the bare result.
  */
-export function formatStockChange(before: number | null, after: number): string {
+export function formatStockChange(
+  before: number | null,
+  after: number,
+): string {
   return before === null ? `${after}` : `${before} \u2192 ${after}`;
 }
 
@@ -134,7 +172,9 @@ export function isOperator(user: SessionUser | null | undefined): boolean {
  * provide so the backend never receives an empty value for an absent
  * filter. Values are URL-encoded by URLSearchParams.
  */
-function buildQuery(params: Record<string, string | number | undefined>): string {
+function buildQuery(
+  params: Record<string, string | number | undefined>,
+): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === "") continue;
@@ -144,10 +184,26 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   return query.length > 0 ? `?${query}` : "";
 }
 
+/**
+ * The queue's `created_to` is exclusive, so a date input has to resolve to the
+ * following day's midnight; otherwise the selected end day filters itself out.
+ */
+export function exclusiveEndOfDay(date: string): string {
+  const parts = date.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+    return date;
+  }
+  const [year, month, day] = parts;
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return `${next.toISOString().slice(0, 10)}T00:00:00`;
+}
+
 export function createOperatorApi(api: ApiClient) {
   return {
     /** List the order queue. Filters map to `status`/`created_from`/`created_to`. */
-    listOrders(filters: OperatorOrderFilters = {}): Promise<OperatorOrderRow[]> {
+    listOrders(
+      filters: OperatorOrderFilters = {},
+    ): Promise<OperatorOrderRow[]> {
       const query = buildQuery({
         status: filters.status,
         created_from: filters.createdFrom,
@@ -158,8 +214,13 @@ export function createOperatorApi(api: ApiClient) {
       return api.get<OperatorOrderRow[]>(`/operator/orders${query}`);
     },
     /** List catalog products including inactive ones, with stock joined in. */
-    listCatalog(pagination: OperatorPagination = {}): Promise<OperatorCatalogRow[]> {
-      const query = buildQuery({ limit: pagination.limit, offset: pagination.offset });
+    listCatalog(
+      pagination: OperatorPagination = {},
+    ): Promise<OperatorCatalogRow[]> {
+      const query = buildQuery({
+        limit: pagination.limit,
+        offset: pagination.offset,
+      });
       return api.get<OperatorCatalogRow[]>(`/operator/catalog${query}`);
     },
     /** Inspect the deterministic payment decision for the given inputs. */
@@ -169,7 +230,9 @@ export function createOperatorApi(api: ApiClient) {
         amount: input.amount,
         currency: input.currency,
       });
-      return api.get<PaymentSimulation>(`/operator/payments/simulation${query}`);
+      return api.get<PaymentSimulation>(
+        `/operator/payments/simulation${query}`,
+      );
     },
     /**
      * Edit a product through the delivered operator route. `changes`
@@ -186,10 +249,26 @@ export function createOperatorApi(api: ApiClient) {
       );
     },
     /** Apply an operator-signed delta through the delivered adjust route. */
-    adjustStock(productId: string, delta: number): Promise<StockAdjustResponse> {
+    adjustStock(
+      productId: string,
+      delta: number,
+    ): Promise<StockAdjustResponse> {
       return api.post<StockAdjustResponse>(
         `/inventory/${encodeURIComponent(productId)}/adjust`,
         { delta },
+      );
+    },
+    /** Confirm a payment-authorized order through the delivered route. */
+    confirmOrder(orderId: string): Promise<ConfirmedOrder> {
+      return api.post<ConfirmedOrder>(
+        `/orders/${encodeURIComponent(orderId)}/confirm`,
+      );
+    },
+    /** Cancel an order with a validated reason through the delivered route. */
+    cancelOrder(orderId: string, reason: string): Promise<CancelledOrder> {
+      return api.post<CancelledOrder>(
+        `/orders/${encodeURIComponent(orderId)}/cancel`,
+        { reason },
       );
     },
   };
