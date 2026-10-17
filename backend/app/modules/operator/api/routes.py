@@ -1,0 +1,86 @@
+"""Operator API routes (U1: read-only order queue).
+
+``GET /api/v1/operator/orders`` requires JWT role ``operator``
+(401 anonymous, 403 otherwise). ``status`` accepts only the five
+delivered order statuses; ``created_from`` is inclusive and
+``created_to`` is exclusive. Money is projected from the latest
+payment row per order and stays null when the order has no payment;
+``item_count`` is the sum of line quantities.
+"""
+
+from collections.abc import AsyncGenerator
+from datetime import datetime
+from typing import Literal
+
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.iam.api.dependencies import require_roles
+from app.modules.iam.application.tokens import CurrentUser
+from app.modules.operator.api.container import (
+    OperatorContainer,
+    operator_container,
+)
+from app.modules.operator.api.schemas import OrderQueueRowResponse
+from app.modules.operator.application.list_order_queue import ListOrderQueue
+from app.shared.db.session import get_db_session
+
+router = APIRouter(prefix="/operator", tags=["operator"])
+
+OPERATOR_ROLE = "operator"
+
+OrderQueueStatus = Literal[
+    "pending",
+    "inventory_reserved",
+    "payment_authorized",
+    "confirmed",
+    "cancelled",
+]
+
+
+async def _operator_db_session(
+    session: AsyncSession = Depends(get_db_session),
+) -> AsyncGenerator[AsyncSession, None]:
+    """Yield a DB session after overriding the global container's session provider."""
+    operator_container.session.override(session)
+    try:
+        yield session
+    finally:
+        operator_container.session.reset_override()
+
+
+@router.get("/orders")
+@inject
+async def list_order_queue(
+    current: CurrentUser = Depends(require_roles(OPERATOR_ROLE)),
+    session: AsyncSession = Depends(_operator_db_session),
+    use_case: ListOrderQueue = Depends(Provide[OperatorContainer.list_order_queue]),
+    status: OrderQueueStatus | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[OrderQueueRowResponse]:
+    del current
+    del session
+    rows = await use_case.execute(
+        status=status,
+        created_from=created_from,
+        created_to=created_to,
+        limit=limit,
+        offset=offset,
+    )
+    return [
+        OrderQueueRowResponse(
+            order_id=row.order_id,
+            customer_id=row.customer_id,
+            status=row.status,
+            created_at=row.created_at,
+            cancel_reason=row.cancel_reason,
+            item_count=row.item_count,
+            total=row.total,
+            currency=row.currency,
+        )
+        for row in rows
+    ]

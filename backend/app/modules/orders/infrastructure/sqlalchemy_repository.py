@@ -1,5 +1,6 @@
 """SQLAlchemy implementation of OrderRepository."""
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -51,6 +52,25 @@ class SqlAlchemyOrderRepository(OrderRepository):
             ]
             self._session.add(orm)
         await self._session.flush()
+
+    async def list_queue(
+        self,
+        status: str | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Order]:
+        stmt = select(OrderModel).order_by(OrderModel.created_at, OrderModel.id)
+        if status is not None:
+            stmt = stmt.where(OrderModel.status == status)
+        if created_from is not None:
+            stmt = stmt.where(OrderModel.created_at >= created_from)
+        if created_to is not None:
+            stmt = stmt.where(OrderModel.created_at < created_to)
+        stmt = stmt.limit(limit).offset(offset)
+        result = await self._session.execute(stmt)
+        return [self._to_domain(orm) for orm in result.scalars().all()]
 
     def _to_domain(self, orm: OrderModel) -> Order:
         return Order(

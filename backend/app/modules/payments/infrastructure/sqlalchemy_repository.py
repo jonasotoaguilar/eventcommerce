@@ -46,6 +46,14 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
             self._session.add(orm)
         await self._session.flush()
 
+    async def list_by_order_ids(self, order_ids: list[UUID]) -> list[Payment]:
+        if not order_ids:
+            return []
+        result = await self._session.execute(
+            select(PaymentModel).where(PaymentModel.order_id.in_(order_ids))
+        )
+        return [self._to_domain(orm) for orm in result.scalars().all()]
+
     def _to_domain(self, orm: PaymentModel) -> Payment:
         return Payment(
             id=orm.id,

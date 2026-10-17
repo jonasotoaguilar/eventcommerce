@@ -128,6 +128,10 @@ class _PayRepo:
     async def save(self, payment: Payment) -> None:
         self.payments.append(payment)
 
+    async def list_by_order_ids(self, order_ids: list[UUID]) -> list[Payment]:
+        wanted = set(order_ids)
+        return [p for p in self.payments if p.order_id in wanted]
+
 
 class _EventRepo:
     def __init__(self) -> None:

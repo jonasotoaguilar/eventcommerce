@@ -1,7 +1,7 @@
 """Tests for AuthorizePayment use case."""
 
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -23,6 +23,10 @@ class InMemoryPaymentRepository(PaymentRepository):
 
     async def save(self, payment: Payment) -> None:
         self.payments.append(payment)
+
+    async def list_by_order_ids(self, order_ids: list[UUID]) -> list[Payment]:
+        wanted = set(order_ids)
+        return [p for p in self.payments if p.order_id in wanted]
 
 
 class TestAuthorizePayment:
