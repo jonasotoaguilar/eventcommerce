@@ -50,6 +50,22 @@ class Settings(BaseSettings):
         default=30, alias="EVENTCOMMERCE_JWT_EXPIRES_MINUTES"
     )
 
+    login_rate_limit_attempts: int = Field(
+        default=10, alias="EVENTCOMMERCE_LOGIN_RATE_LIMIT_ATTEMPTS"
+    )
+    login_rate_limit_host_attempts: int = Field(
+        default=60, alias="EVENTCOMMERCE_LOGIN_RATE_LIMIT_HOST_ATTEMPTS"
+    )
+    login_rate_limit_window_seconds: float = Field(
+        default=60.0, alias="EVENTCOMMERCE_LOGIN_RATE_LIMIT_WINDOW_SECONDS"
+    )
+    register_rate_limit_attempts: int = Field(
+        default=20, alias="EVENTCOMMERCE_REGISTER_RATE_LIMIT_ATTEMPTS"
+    )
+    register_rate_limit_window_seconds: float = Field(
+        default=60.0, alias="EVENTCOMMERCE_REGISTER_RATE_LIMIT_WINDOW_SECONDS"
+    )
+
     @computed_field
     def database_url(self) -> str:
         return (
