@@ -28,8 +28,8 @@
     "eslint": "^9.12.0",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.8.1",
-    "vite": "^6.4.3",
-    "vitest": "^4.1.11"
+    "vite": "^6.4.5",
+    "vitest": "^4.1.12"
   },
   "allowScripts": {
     "esbuild@0.25.12": true
